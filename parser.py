@@ -190,7 +190,11 @@ def FT(key):
 	print('key: ' + recurstr(key))
 	return key
 
+special = ['=', '.']
+
 matchers = [
+	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', '.'), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression'), True)
+] + [
 	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
 ] + [
 	PatternMatcher([('expression',), ('unifix_operator',)], lambda x, y: y.addChild(x).addType('postfix/expression').rmType('unifix_operator')),
@@ -199,12 +203,14 @@ matchers = [
 	PatternMatcher([('expression',), ('bracket',)], lambda x, y: ASTNode(lexer.Token('call/expression', ''), [x] + (y.children[0].children if y.children and y.children[0].token.type == 'comma' else y.children))),
 	PatternMatcher([('expression',), ('list',)], lambda x, y: ASTNode(lexer.Token('getitem/expression', ''), [x, ASTNode(lexer.Token('expression/comma_expr', ''), y.children[0].children) if y.children and y.children[0].token.type == 'comma' else y.children[0]])),
 ] + [
-	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', row), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression'), True) for row in lexer.binary_RTL
+	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', [elem for elem in row if elem not in special]), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression'), True) for row in lexer.binary_RTL
 ] + [
-	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', row), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')) for row in lexer.binary_operators
+	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', [elem for elem in row if elem not in special]), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')) for row in lexer.binary_operators
 ] + [
-	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr') if 'expression' in x.type.split('/') else x.addChild(z)),
-	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr'))
+	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
+	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr/expression'))
+] + [
+	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression'), True)
 ] + [
 	# PatternMatcher([('open_slice',), ('colon',)], lambda x, y: x.addChild(ASTNode(lexer.Token('none', '')))),
 	# PatternMatcher([])

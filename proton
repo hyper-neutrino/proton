@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+
+import lexer, parser, interpreter, sys, traceback
+
+from errors import *
+
+if __name__ == '__main__':
+	symlist = interpreter.default
+	if sys.argv[1:]:
+		interpreter.complete(parser.parse(lexer.tokenize(open(sys.argv[1], 'r').read())))
+	else:
+		code = ''
+		while True:
+			try:
+				code += input('... ' if code else '>>> ') + '\n'
+			except (EOFError, KeyboardInterrupt):
+				print()
+				exit(0)
+			try:
+				result = interpreter.complete(parser.parse(lexer.tokenize(code)), symlist)
+				if result is not None: print(result)
+				code = ''
+			except (UnclosedBracketError, UnclosedStringError):
+				pass
+			except:
+				print(traceback.format_exc())
+				code = ''

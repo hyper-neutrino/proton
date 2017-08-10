@@ -1,8 +1,10 @@
-import parser, lexer, operator, math, sys
+import parser, lexer, operator, math, sys, builtins
 
 def f(x):
 	if isinstance(x, Identifier):
 		return x()
+	elif hasattr(x, '__iter__') and not isinstance(x, str):
+		return type(x)(map(f, x))
 	return x
 
 def _(op):
@@ -10,6 +12,35 @@ def _(op):
 
 def __(op):
 	return lambda x, y: x(op(f(x), f(y)))
+
+def subref(x, y):
+	ident = isinstance(y, Identifier)
+	y = y.name if ident else y
+	def getter():
+		return getattr(f(x), y) if ident and hasattr(f(x), y) else f(x)[y]
+	def setter(*args):
+		if ident and hasattr(f(x), y):
+			setattr(f(x), y, args[0])
+		else:
+			f(x)[y] = args[0]
+	return Identifier('', getter, setter)
+
+def assign(x, y):
+	if hasattr(x, '__iter__'):
+		if hasattr(y, '__iter__'):
+			if len(x) < len(y):
+				raise RuntimeError('Too many values to unpack (expected %d)' % len(x))
+			elif len(x) > len(y):
+				raise RuntimeError('Not enough values to unpack (needed %d)' % len(x))
+			else:
+				for i in range(len(x)):
+					assign(x[i], y[i])
+				return x
+		else:
+			raise RuntimeError('Right side of assignment must be iterable if left side is iterable')
+	else:
+		return x(f(y))
+
 
 infix_operators = {
 	'**': _(operator.pow),
@@ -26,7 +57,9 @@ infix_operators = {
 	'>=': _(operator.ge),
 	'==': _(operator.eq),
 	'+=': __(operator.add),
-	'=': lambda x, y: x(f(y)),
+	'in': __(lambda x, y: x in y),
+	'=': assign,
+	'.': subref
 }
 
 def ___(op):
@@ -37,11 +70,12 @@ prefix_operators = {
 }
 
 postfix_operators = {
-	'!': ___(lambda x: math.gamma(x + 1))
+	'!': ___(lambda x: type(x)(math.gamma(x + 1)))
 }
 
 class Identifier:
-	def __init__(self, getter, setter):
+	def __init__(self, name, getter, setter):
+		self.name = name
 		self.getter = getter
 		self.setter = setter
 	def __call__(self, *args):
@@ -52,17 +86,17 @@ def listify(func):
 	return lambda *args, **kwargs: list(func(*args, **kwargs))
 
 default = {
-	'print': print,
-	'eval': eval,
-	'input': input,
-	'range': listify(range),
-	'sum': sum
+
 }
 
+for name in dir(builtins):
+	try:
+		default[name] = eval(name)
+	except:
+		pass
+
 def hardeval(tree, symlist = None, comma_mode = tuple):
-	value = evaluate(tree, symlist, comma_mode)
-	if isinstance(value, Identifier): return value()
-	return value
+	return f(evaluate(tree, symlist, comma_mode))
 
 def evaluate(tree, symlist = None, comma_mode = tuple):
 	symlist = symlist or default
@@ -74,10 +108,10 @@ def evaluate(tree, symlist = None, comma_mode = tuple):
 		def getter():
 			if tree.token.content in symlist:
 				return symlist[tree.token.content]
-			raise NameError("name '%s' is not defined" % tree.token.content)
+			return 0
 		def setter(*args):
 			symlist[tree.token.content] = args[0]
-		return Identifier(getter, setter)
+		return Identifier(tree.token.content, getter, setter)
 	elif tree.token.content == 'unless':
 		if hardeval(tree.children[1], symlist):
 			evaluate(tree.children[2], symlist)
@@ -116,7 +150,11 @@ def evaluate(tree, symlist = None, comma_mode = tuple):
 	elif 'call' in treetype:
 		return hardeval(tree.children[0], symlist)(*[hardeval(child, symlist) for child in tree.children[1:]])
 	elif 'getitem' in treetype:
-		return hardeval(tree.children[0], symlist)[hardeval(tree.children[1], symlist)]
+		def getter():
+			return hardeval(tree.children[0], symlist)[hardeval(tree.children[1], symlist)]
+		def setter(*args):
+			hardeval(tree.children[0], symlist)[hardeval(tree.children[1], symlist)] = args[0]
+		return Identifier('', getter, setter)
 	elif 'expression' in treetype:
 		return evaluate(tree.children[0], symlist)
 
@@ -125,8 +163,10 @@ class Interpreter:
 		self.tree = tree
 	def interpret(self, symlist = None):
 		symlist = symlist or {x: default[x] for x in default}
+		resut = None
 		for tree in self.tree:
-			evaluate(tree, symlist)
+			result = hardeval(tree, symlist)
+		return result
 
 def complete(tree, symlist = None):
-	Interpreter(tree).interpret(symlist)
+	return Interpreter(tree).interpret(symlist)

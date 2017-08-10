@@ -9,3 +9,7 @@ class UnopenedBracketError(BracketError):
 class UnclosedBracketError(BracketError):
 	def __init__(self):
 		pass
+
+class UnclosedStringError(RuntimeError):
+	def __init__(self):
+		pass
