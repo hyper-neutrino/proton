@@ -59,8 +59,12 @@ class ErrorMatcher(LexerMatcher):
 	def skip(self, code, match):
 		return self.matcher.skip(code, match)
 
+def FT(key):
+	print (key)
+	return key
+
 def oper_matcher(array, name, counter = []):
-	return LexerMatcher(lambda code: [k for k in (lambda x: len(x) == 1 and x or [])([operator for operator in array if code.startswith(operator)]) if k not in counter], lambda code, match: (max(map(len, match)), Token(name, max(match, key = len))))
+	return LexerMatcher(lambda code: [operator for operator in array if code.startswith(operator) and operator not in counter], lambda code, match: (max(map(len, match)), Token(name, max(match, key = len))))
 
 class Lexer:
 	def __init__(self, rules, code):
@@ -83,7 +87,7 @@ class Lexer:
 					token = rule.get(code, match)
 					self.index += token[0]
 					return token[1]
-		raise RuntimeError('Unknown token at index %d' % self.index)
+		raise RuntimeError('Unknown token at index %d: "...%s..."' % (self.index, self.code[self.index:][:10].replace('\n', '\\n')))
 
 binary_RTL = [
 	('**',),
@@ -134,10 +138,10 @@ matchers = [
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
-	RegexMatcher(r'(if|else|unless)', 0, 'keyword'),
+	RegexMatcher(r'(if|else|unless|while|for)', 0, 'keyword'),
+	oper_matcher(unifix_operators, 'unifix_operator'),
 	oper_matcher(sum(binary_operators, ()), 'binary_operator', sum(binary_RTL, ())),
 	oper_matcher(sum(binary_RTL, ()), 'binary_RTL'),
-	oper_matcher(unifix_operators, 'unifix_operator'),
 	RegexMatcher(r'[A-Za-z_][A-Za-z_0-9]*', 0, 'identifier:expression'),
 	RegexMatcher(r'[\(\)\[\]\{\}]', 0, 'bracket'),
 	RegexMatcher(r'\s+', -1, 'whitespace'),
@@ -151,3 +155,6 @@ def tokens(code, matchers = matchers):
 
 def tokenize(code, matchers = matchers):
 	return list(tokens(code, matchers))
+
+if __name__ == '__main__':
+	for i in tokens(open(sys.argv[1], 'r').read()): print(i)

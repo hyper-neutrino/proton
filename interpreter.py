@@ -66,11 +66,15 @@ def ___(op):
 	return lambda x: op(f(x))
 
 prefix_operators = {
-	'!': ___(operator.not_)
+	'!': ___(operator.not_),
+	'++': lambda x: assign(x, f(x) + 1),
+	'--': lambda x: assign(x, f(x) - 1)
 }
 
 postfix_operators = {
-	'!': ___(lambda x: type(x)(math.gamma(x + 1)))
+	'!': ___(lambda x: type(x)(math.gamma(x + 1))),
+	'++': lambda x: assign(x, f(x) + 1) - 1,
+	'--': lambda x: assign(x, f(x) - 1) + 1,
 }
 
 class Identifier:
@@ -122,6 +126,17 @@ def evaluate(tree, symlist = None, comma_mode = tuple):
 			evaluate(tree.children[1], symlist)
 		elif len(tree.children) > 2:
 			evaluate(tree.children[2], symlist)
+	elif tree.token.content == 'while':
+		while hardeval(tree.children[0], symlist):
+			evaluate(tree.children[1], symlist)
+	elif tree.token.content == 'for':
+		if 'foreach' in treetype:
+			pass
+		else:
+			evaluate(tree.children[0], symlist)
+			while hardeval(tree.children[1], symlist):
+				evaluate(tree.children[-1], symlist)
+				if len(tree.children) >= 4: evaluate(tree.children[2], symlist)
 	elif 'binary_operator' in tokentype or 'binary_RTL' in tokentype:
 		if tree.token.content in infix_operators:
 			return infix_operators[tree.token.content](evaluate(tree.children[0], symlist), evaluate(tree.children[1], symlist))
