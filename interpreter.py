@@ -116,6 +116,7 @@ def exists(value, symlist):
 
 prefix_operators = {
 	'!': ___(operator.not_),
+	'~': ___(operator.invert),
 	'++': lambda x, z: (lambda k: k(f(k) + 1))(evaluate(x, z)),
 	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z))
 }
