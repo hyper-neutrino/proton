@@ -59,12 +59,20 @@ class ErrorMatcher(LexerMatcher):
 	def skip(self, code, match):
 		return self.matcher.skip(code, match)
 
-def FT(key):
-	print (key)
-	return key
+class ftobj:
+	def __init__(self):
+		pass
+	def __getitem__(self, value):
+		print (value)
+		return value
+	def __call__(self, value):
+		print (value)
+		return value
+
+FT = ftobj()
 
 def oper_matcher(array, name, counter = []):
-	return LexerMatcher(lambda code: [operator for operator in array if code.startswith(operator) and operator not in counter], lambda code, match: (max(map(len, match)), Token(name, max(match, key = len))))
+	return LexerMatcher(lambda code: (lambda x: (lambda y: y if y not in counter else '')(x and max(x, key=len)))([operator for operator in array if code.startswith(operator)]), lambda code, match: (len(match), Token(name, match)))
 
 class Lexer:
 	def __init__(self, rules, code):
@@ -139,10 +147,10 @@ matchers = [
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
 	RegexMatcher(r'(if|else|unless|while|for|try|except)', 0, 'keyword'),
+	RegexMatcher(r'[A-Za-z_][A-Za-z_0-9]*', 0, 'identifier:expression'),
 	oper_matcher(unifix_operators, 'unifix_operator'),
 	oper_matcher(sum(binary_operators, ()), 'binary_operator', sum(binary_RTL, ())),
 	oper_matcher(sum(binary_RTL, ()), 'binary_RTL'),
-	RegexMatcher(r'[A-Za-z_][A-Za-z_0-9]*', 0, 'identifier:expression'),
 	RegexMatcher(r'[\(\)\[\]\{\}]', 0, 'bracket'),
 	RegexMatcher(r'\s+', -1, 'whitespace'),
 	RegexMatcher(r';', 0, 'statement'),
