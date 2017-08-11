@@ -149,7 +149,7 @@ default = {
 for name in dir(builtins):
 	try:
 		default[name] = eval(name)
-		if isinstance(default[name], (type(print), type(lambda:0))):
+		if isinstance(default[name], (type(print), type(lambda:0), type(type))):
 			default[name] = Function(default[name])
 	except:
 		pass
