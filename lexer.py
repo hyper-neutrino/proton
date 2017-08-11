@@ -138,7 +138,7 @@ matchers = [
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
-	RegexMatcher(r'(if|else|unless|while|for)', 0, 'keyword'),
+	RegexMatcher(r'(if|else|unless|while|for|try|except)', 0, 'keyword'),
 	oper_matcher(unifix_operators, 'unifix_operator'),
 	oper_matcher(sum(binary_operators, ()), 'binary_operator', sum(binary_RTL, ())),
 	oper_matcher(sum(binary_RTL, ()), 'binary_RTL'),

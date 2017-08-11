@@ -4,7 +4,10 @@ def f(x):
 	if isinstance(x, Identifier):
 		return x()
 	elif hasattr(x, '__iter__') and not isinstance(x, str):
-		return type(x)(map(f, x))
+		try:
+			return type(x)(map(f, x))
+		except:
+			return x
 	return x
 
 def _(op):
@@ -131,12 +134,20 @@ def evaluate(tree, symlist = None, comma_mode = tuple):
 			evaluate(tree.children[1], symlist)
 	elif tree.token.content == 'for':
 		if 'foreach' in treetype:
-			pass
+			for val in hardeval(tree.children[1], symlist):
+				assign(evaluate(tree.children[0], symlist), val)
+				evaluate(tree.children[2], symlist)
 		else:
 			evaluate(tree.children[0], symlist)
 			while hardeval(tree.children[1], symlist):
 				evaluate(tree.children[-1], symlist)
 				if len(tree.children) >= 4: evaluate(tree.children[2], symlist)
+	elif tree.token.content == 'try':
+		try:
+			hardeval(tree.children[0], symlist)
+		except Exception as e:
+			assign(evaluate(tree.children[1], symlist), e)
+			evaluate(tree.children[2], symlist)
 	elif 'binary_operator' in tokentype or 'binary_RTL' in tokentype:
 		if tree.token.content in infix_operators:
 			return infix_operators[tree.token.content](evaluate(tree.children[0], symlist), evaluate(tree.children[1], symlist))
@@ -178,7 +189,7 @@ class Interpreter:
 		self.tree = tree
 	def interpret(self, symlist = None):
 		symlist = symlist or {x: default[x] for x in default}
-		resut = None
+		result = None
 		for tree in self.tree:
 			result = hardeval(tree, symlist)
 		return result

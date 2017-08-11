@@ -47,8 +47,11 @@ class ASTNode:
 	def __eq__(self, other):
 		return isinstance(other, ASTNode) and other.type == self.type and other.token == self.token and other.children == self.children
 
+def isiter(obj):
+	return hasattr(obj, '__iter__') and not isinstance(obj, str)
+
 def match(left, right):
-	return right == None or isinstance(right, tuple) and any(k in right for k in left) or isinstance(right, (type(print), type(lambda: 0))) and right(left) or right in left
+	return right == None or isinstance(right, tuple) and any(k in right for k in left) or isinstance(right, (type(print), type(lambda: 0))) and right(left) or any(right == elem for elem in left)
 
 class SingleASTMatcher:
 	def __init__(self, type = None, tokentype = None, content = None, children = None):
@@ -162,7 +165,11 @@ class Parser:
 					match = rule.match(self.tree[iterindex:])
 					if match:
 						result = rule.get(self.tree[iterindex:], match[1])
-						if rule.reiter: result = Parser(self.rules, result, True).construct_tree()
+						if rule.reiter:
+							if rule.reiter is True:
+								result = Parser(self.rules, result, True).construct_tree()
+							else:
+								result = Parser(self.rules + rule.reiter, result, True).construct_tree()
 						if hasattr(rule, 'postconfig'): result = rule.postconfig(result)
 						if not isinstance(result, list): result = [result]
 						self.tree[iterindex:iterindex + match[0]] = result
@@ -176,14 +183,16 @@ class Parser:
 				index = 0
 		return self.tree
 
-def recurstr(array):
-	if isinstance(array, list):
-		return str(list(map(recurstr, array)))
-	return str(array)
-
 def FT(key):
-	print('key: ' + recurstr(key))
-	return key
+	# print(type(key))
+	if hasattr(key, '__iter__') and not isinstance(key, str):
+		result = []
+		for i in key:
+			result.append(FT(i))
+		return type(key)(result)
+	else:
+		print(key)
+		return key
 
 special = ['=', '.']
 
@@ -191,6 +200,8 @@ matchers = [
 	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', '.'), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator'), True)
 ] + [
 	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
+] + [
+	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'colon' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('foriter')),
 ] + [
 	PatternMatcher([('expression',), ('unifix_operator',)], lambda x, y: y.addChild(x).addType('postfix/expression').rmType('unifix_operator')),
 	PatternMatcher([('unifix_operator',), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
@@ -207,16 +218,19 @@ matchers = [
 ] + [
 	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True)
 ] + [
-	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('statement', 'statement', ';')], lambda x, y: x)
+	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('statement', 'statement', ';')], lambda x, y: x.addType('statement'))
 ] + [
 	MultiTypeMatch([
-		PatternMatcher([('keyword', 'keyword', 'for')] + [(('expression', 'statement'),)] * 4, lambda v, w, x, y, z: v.addChildren([w, x, y, z]).addType('statement')),
-		PatternMatcher([('keyword', 'keyword', 'for'), ('bracket',), (('expression', 'statement'),)], lambda x, y, z: x.addChildren(y.children).addChild(z).addType('statement')),
-		PatternMatcher([('keyword', 'keyword', 'while'), ('expression',), (('expression', 'statement'),)], lambda x, y, z: x.addChild(y).addChild(z).addType('statement')),
-		PatternMatcher([('expression',), ('keyword', 'keyword', 'unless'), ('expression',), (('expression', 'statement'),)], lambda w, x, y, z: x.addChildren([w, y, z]).addType('statement')),
-		PatternMatcher([('keyword', 'keyword', 'if'), ('expression',), (('expression', 'statement'),)], lambda x, y, z: x.addChild(y).addChild(z).addType('statement')),
-		PatternMatcher([('keyword', 'keyword', 'else'), (('expression', 'statement'),)], lambda x, y: x.addChild(y).addType('statement')),
-		PatternMatcher([('keyword', 'keyword', 'if'), ('keyword', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]))
+		PatternMatcher([('keyword', 'keyword', 'for'), ('expression',), ('colon',), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement/foreach').rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'for')] + [(('expression', 'statement'),)] * 4, lambda v, w, x, y, z: v.addChildren([w, x, y, z]).addType('statement').rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'for'), ('foriter',), (('expression', 'statement'),)], lambda x, y, z: x.addChildren(y.children).addChild(z).addType('statement/foreach').rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'for'), ('bracket',), (('expression', 'statement'),)], lambda x, y, z: x.addChildren(y.children).addChild(z).addType('statement').rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'while'), ('expression',), (('expression', 'statement'),)], lambda x, y, z: x.addChild(y).addChild(z).addType('statement').rmType('keyword')),
+		PatternMatcher([('expression',), ('keyword', 'keyword', 'unless'), ('expression',), (('expression', 'statement'),)], lambda w, x, y, z: x.addChildren([w, y, z]).addType('statement').rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'if'), ('expression',), (('expression', 'statement'),)], lambda x, y, z: x.addChild(y).addChild(z).addType('statement').rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'else'), (('expression', 'statement'),)], lambda x, y: x.addChild(y).addType('statement').rmType('keyword')),
+		PatternMatcher([([], 'keyword', 'if'), ([], 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
+		PatternMatcher([('keyword', 'keyword', 'try'), (('expression', 'statement'),), ('keyword', 'keyword', 'except'), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement').rmType('keyword')),
 	], RTL = True)
 ]
 
