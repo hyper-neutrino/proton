@@ -3,25 +3,40 @@
 import lexer, parser, interpreter, sys, traceback
 
 from errors import *
+from utils import *
+
+cflag_usage = '''Argument expected for the -c option
+usage: proton [file | -c code] [args...]'''
 
 if __name__ == '__main__':
 	symlist = interpreter.default
 	if sys.argv[1:]:
-		interpreter.complete(parser.parse(lexer.tokenize(open(sys.argv[1], 'r').read())))
+		if sys.argv[1] == '-c':
+			if sys.argv[2:]:
+				interpreter.complete(parser.parse(lexer.tokenize(sys.argv[2])))
+			else:
+				raise SystemExit(cflag_usage)
+		else:
+			interpreter.complete(parser.parse(lexer.tokenize(open(sys.argv[1], 'r').read())))
 	else:
 		code = ''
 		while True:
 			try:
 				code += input('... ' if code else '>>> ') + '\n'
-			except (EOFError, KeyboardInterrupt):
+			except EOFError:
 				print()
 				exit(0)
+			except KeyboardInterrupt:
+				print('\b\bKeyboardInterrupt')
 			try:
 				result = interpreter.complete(parser.parse(lexer.tokenize(code)), symlist)
 				if result is not None: print(result)
 				code = ''
 			except (UnclosedBracketError, UnclosedStringError):
 				pass
+			except KeyboardInterrupt:
+				print('\b\bKeyboardInterrupt')
+				code = ''
 			except:
 				print(traceback.format_exc())
 				code = ''

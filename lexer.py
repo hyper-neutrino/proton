@@ -1,6 +1,7 @@
 import re, ast, sys
 
 from errors import *
+from utils import *
 
 class Token:
 	def __init__(self, type, content, **kwargs):
@@ -59,17 +60,7 @@ class ErrorMatcher(LexerMatcher):
 	def skip(self, code, match):
 		return self.matcher.skip(code, match)
 
-class ftobj:
-	def __init__(self):
-		pass
-	def __getitem__(self, value):
-		print (value)
-		return value
-	def __call__(self, value):
-		print (value)
-		return value
-
-FT = ftobj()
+identifier_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789'
 
 def oper_matcher(array, name, counter = []):
 	return LexerMatcher(lambda code: (lambda x: (lambda y: y if y not in counter else '')(x and max(x, key=len)))([operator for operator in array if code.startswith(operator)]), lambda code, match: (len(match), Token(name, match)))
@@ -93,8 +84,9 @@ class Lexer:
 					return self.__next__()
 				else:
 					token = rule.get(code, match)
-					self.index += token[0]
-					return token[1]
+					if token is not None:
+						self.index += token[0]
+						return token[1]
 		raise RuntimeError('Unknown token at index %d: "...%s..."' % (self.index, self.code[self.index:][:10].replace('\n', '\\n')))
 
 binary_RTL = [
@@ -105,26 +97,22 @@ binary_RTL = [
 binary_operators = [
 	('.',),
 	('**',),
-	('*', '/', '//'),
-	('+', '-'),
 	('>>', '<<'),
+	('*', '/', '//'),
+	('%',),
+	('+', '-'),
 	('>', '<', '<=', '>='),
-	('**=', '*=', '/=', '//=', '+=', '-=', '>>=', '<<='),
-	('==', '!=', ':=', '='),
+	('&',),
+	('|',),
+	('^',),
+	('&&', 'and'),
+	('||', 'or'),
 	('in', 'not in',),
-	('and',),
-	('or',),
+	('**=', '*=', '/=', '//=', '+=', '-=', '>>=', '<<=', '%=', '&=', '|=', '&&=', '||='),
+	('==', '!=', ':=', '=', '=:'),
 ]
 
-unifix_operators = ['!', '++', '--', '~']
-
-class Pipe:
-	def __init__(self, function):
-		self.function = function
-	def __ror__(self, other):
-		return self.function(other)
-	def __call__(self, *args, **kwargs):
-		return Pipe(lambda x: self.function(x, *args, **kwargs))
+unifix_operators = ['!', '++', '--', '~', 'exists', 'exists not']
 
 def recurstr(array):
 	if isinstance(array, (map,)):
@@ -133,29 +121,30 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-def FT(key):
-	print(recurstr(key))
-	return key
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist']
+
+operators = sum(binary_operators, ()) + sum(binary_RTL, ()) + tuple(unifix_operators)
 
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
-	RegexMatcher(r'(\d+\.\d*|\d*\.\d+)', 0, 'literal:expression', float),
+	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),
 	RegexMatcher(r'\d+', 0, 'literal:expression', int),
 	RegexMatcher(r'"([^"\\]|\\.)*"', 0, 'literal:expression', lambda x: ast.literal_eval('""%s""' % x)),
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
-	RegexMatcher(r'(if|else|unless|while|for|try|except)', 0, 'keyword'),
-	RegexMatcher(r'[A-Za-z_][A-Za-z_0-9]*', 0, 'identifier:expression'),
+	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
+	RegexMatcher(r';', 0, 'statement'),
+	RegexMatcher(r',', 0, 'comma'),
+	RegexMatcher(r'\?', 0, 'ternary'),
+	RegexMatcher(r'->', 0, 'arrow'),
 	oper_matcher(unifix_operators, 'unifix_operator'),
 	oper_matcher(sum(binary_operators, ()), 'binary_operator', sum(binary_RTL, ())),
 	oper_matcher(sum(binary_RTL, ()), 'binary_RTL'),
+	RegexMatcher(r':', 0, 'colon'),
 	RegexMatcher(r'[\(\)\[\]\{\}]', 0, 'bracket'),
 	RegexMatcher(r'\s+', -1, 'whitespace'),
-	RegexMatcher(r';', 0, 'statement'),
-	RegexMatcher(r',', 0, 'comma'),
-	RegexMatcher(r':', 0, 'colon'),
 ]
 
 def tokens(code, matchers = matchers):
