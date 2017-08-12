@@ -213,6 +213,8 @@ matchers = [
 ] + [
 	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', tuple(elem for elem in row if elem not in special)), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')) for row in lexer.binary_operators
 ] + [
+	PatternMatcher([('binary_operator', 'binary_operator', '-'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator'))
+]+ [
 	PatternMatcher([('expression',), ('keyword', 'keyword', name), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('keyword')) for name in ['from', 'as']
 ] + [
 	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
@@ -247,7 +249,8 @@ matchers = [
 		PatternMatcher([('keyword', 'keyword', 'try'), (('expression', 'statement'),), ('keyword', 'keyword', 'except'), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement').rmType('keyword')),
 	], RTL = True)
 ] + [
-	PatternMatcher([('expression',), ('ternary',), ('expression',), ('colon',), ('expression',)], lambda v, w, x, y, z: w.addChildren([v, x, z]).addType('expression').rmType('ternary'))
+	PatternMatcher([('expression',), ('ternary',), ('expression',), ('colon',), ('expression',)], lambda v, w, x, y, z: w.addChildren([v, x, z]).addType('expression').rmType('ternary')),
+	PatternMatcher([('expression',), ('lambda',), (('expression', 'statement'),)], lambda x, y, z: y.addChild(x).addChild(z).setType('lambda/expression')),
 ]
 
 def parse(tokens):

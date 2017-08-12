@@ -143,6 +143,7 @@ matchers = [
 	RegexMatcher(r',', 0, 'comma'),
 	RegexMatcher(r'\?', 0, 'ternary'),
 	RegexMatcher(r'->', 0, 'arrow'),
+	RegexMatcher(r'=>', 0, 'lambda'),
 	oper_matcher(operators, [('unifix_operator', unifix_operators), ('binary_RTL', sum(binary_RTL, ())), ('binary_operator', sum(binary_operators, ()))]),
 	RegexMatcher(r':', 0, 'colon'),
 	RegexMatcher(r'[\(\)\[\]\{\}]', 0, 'bracket'),

@@ -146,11 +146,15 @@ def exists(value, symlist):
 			return ident.name in symlist or ident.name == '.getitem' and cando(ident) or ident() is not None
 		return True
 
+def negative(value):
+	return -value
+
 prefix_operators = {
 	'!': ___(operator.not_),
 	'~': ___(operator.invert),
 	'++': lambda x, z: (lambda k: k(f(k) + 1))(evaluate(x, z)),
-	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z))
+	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z)),
+	'-': ___(negative),
 }
 
 postfix_operators = {
@@ -343,6 +347,8 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		def setter(*args):
 			hardeval(tree.children[0], symlist, looped = looped, func = func)[hardeval(tree.children[1], symlist, looped = looped, func = func)] = args[0]
 		return Identifier('.getitem', getter, setter)
+	elif 'lambda' in treetype:
+		pass # TODO
 	elif 'expression' in treetype:
 		return evaluate(tree.children[0], symlist, looped = looped, func = func)
 
