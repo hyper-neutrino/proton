@@ -220,7 +220,16 @@ matchers = [
 ] + [
 	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('statement', 'statement', ';')], lambda x, y: x.addType('statement'))
 ] + [
-	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exist')], lambda x, y: y.addChild(x).addType('expression').rmType('keyword'))
+	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exist')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
+	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exists')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
+	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exist not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
+	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exists not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
+] + [
+	PatternMatcher([('expression',), ('keyword', 'keyword', name), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('keyword')) for name in ['from', 'as']
+] + [
+	PatternMatcher([('keyword', 'keyword', 'import'), ('expression',)], lambda x, y: x.addChild(y).addType('expression').rmType('keyword'))
+] + [
+	PatternMatcher([('keyword', 'keyword', statement)], lambda x: x.setType(statement + '_statement/expression')) for statement in ['break', 'continue']
 ] + [
 	MultiTypeMatch([
 		PatternMatcher([('keyword', 'keyword', 'for'), ('expression',), ('colon',), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement/foreach').rmType('keyword')),

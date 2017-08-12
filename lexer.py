@@ -62,8 +62,12 @@ class ErrorMatcher(LexerMatcher):
 
 identifier_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789'
 
-def oper_matcher(array, name, counter = []):
-	return LexerMatcher(lambda code: (lambda x: (lambda y: y if y not in counter else '')(x and max(x, key=len)))([operator for operator in array if code.startswith(operator)]), lambda code, match: (len(match), Token(name, match)))
+def findv(operator, values):
+	for value in values:
+		if operator in value[1]: return value[0]
+
+def oper_matcher(array, values, counter = []):
+	return LexerMatcher(lambda code: (lambda x: (lambda y: y if y not in counter else '')(x and max(x, key=len)))([operator for operator in array if code.startswith(operator)]), lambda code, match: (len(match), Token(findv(match, values), match)))
 
 class Lexer:
 	def __init__(self, rules, code):
@@ -112,7 +116,7 @@ binary_operators = [
 	('==', '!=', ':=', '=', '=:'),
 ]
 
-unifix_operators = ['!', '++', '--', '~', 'exists', 'exists not']
+unifix_operators = ['!', '++', '--', '~']
 
 def recurstr(array):
 	if isinstance(array, (map,)):
@@ -121,7 +125,7 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist']
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist', 'exist not', 'exists', 'exists not', 'break', 'continue', 'import', 'include', 'as', 'from']
 
 operators = sum(binary_operators, ()) + sum(binary_RTL, ()) + tuple(unifix_operators)
 
@@ -139,9 +143,7 @@ matchers = [
 	RegexMatcher(r',', 0, 'comma'),
 	RegexMatcher(r'\?', 0, 'ternary'),
 	RegexMatcher(r'->', 0, 'arrow'),
-	oper_matcher(unifix_operators, 'unifix_operator'),
-	oper_matcher(sum(binary_operators, ()), 'binary_operator', sum(binary_RTL, ())),
-	oper_matcher(sum(binary_RTL, ()), 'binary_RTL'),
+	oper_matcher(operators, [('unifix_operator', unifix_operators), ('binary_RTL', sum(binary_RTL, ())), ('binary_operator', sum(binary_operators, ()))]),
 	RegexMatcher(r':', 0, 'colon'),
 	RegexMatcher(r'[\(\)\[\]\{\}]', 0, 'bracket'),
 	RegexMatcher(r'\s+', -1, 'whitespace'),

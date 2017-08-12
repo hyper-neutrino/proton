@@ -1,6 +1,34 @@
 import parser, lexer, operator, math, sys, builtins
 
 from utils import *
+from copy import *
+
+def _import(value, symlist):
+	treetype = value.type.split('/')
+	tokentype = value.token.type.replace(':', '/').split('/')
+	if 'comma_expr' in treetype:
+		for v in value.children: _import(v, symlist)
+	elif 'expression' in treetype and 'keyword' in tokentype and value.token.content == 'as':
+		if 'expression' in value.children[0].type.split('/') and 'keyword' in value.children[0].token.type.replace(':', '/').split('/') and value.children[0].token.content == 'from':
+			assign = evaluate(value.children[1], symlist)
+			name = evaluate(value.children[0].children[0], symlist)
+			module = evaluate(value.children[0].children[1], symlist)
+			assert isinstance(assign, Identifier) and isinstance(name, Identifier) and isinstance(module, Identifier)
+			symlist[assign.name] = getattr(__import__(module.name), name.name)
+		else:
+			name, assign = evaluate(value.children[0], symlist), evaluate(value.children[1], symlist)
+			assert isinstance(name, Identifier) and isinstance(assign, Identifier)
+			symlist[assign.name] = __import__(name.name)
+	elif 'expression' in treetype and 'keyword' in tokentype and value.token.content == 'from':
+		name = evaluate(value.children[0], symlist)
+		module = evaluate(value.children[1], symlist)
+		assert isinstance(name, Identifier) and isinstance(module, Identifier)
+		symlist[name.name] = getattr(__import__(module.name), name.name)
+	elif 'identifier' in tokentype:
+		value = evaluate(value, symlist)
+		symlist[value.name] = __import__(value.name)
+	else:
+		raise SyntaxError('import statement not recognized')
 
 def _s(op):
 	def inner(x, y):
@@ -57,6 +85,9 @@ def contains(x, y, s):
 	else:
 		return f(evaluate(x, s)) in f(evaluate(y, s))
 
+def EQ(x, y):
+	return f(x) == f(y)
+
 infix_operators = {
 	'**': _(operator.pow),
 	'>>': _(operator.rshift),
@@ -71,7 +102,8 @@ infix_operators = {
 	'<': _(operator.lt),
 	'<=': _(operator.le),
 	'>=': _(operator.ge),
-	'==': _(operator.eq),
+	'==': _(EQ),
+	'!=': _(inverse(EQ)),
 	'in': contains,
 	'not in': inverse(contains),
 	'&': _(operator.and_),
@@ -124,10 +156,12 @@ prefix_operators = {
 postfix_operators = {
 	'!': ___(lambda x: type(x)(math.gamma(x + 1))),
 	'++': lambda x, z: (lambda k: k(f(k) + 1))(evaluate(x, z)) - 1,
-	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z)) + 1,
-	'exists': exists,
-	'exists not': inverse(exists)
+	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z)) + 1
 }
+
+class Statement:
+	def __init__(self, name):
+		self.name = name
 
 class Identifier:
 	def __init__(self, name, getter, setter):
@@ -157,32 +191,24 @@ for name in dir(builtins):
 
 default['eval'] = lambda s, x: complete(parser.parse(lexer.tokenize(x)), s)
 
-def clone(obj):
-	if isinstance(obj, (tuple, list, set)):
-		return type(obj)(map(clone, obj))
-	elif isinstance(obj, dict):
-		return {elem: clone(obj[elem]) for elem in obj}
-	else:
-		return obj
-
 def merge(d1, d2):
 	for x in d1:
 		if x in d2:
 			d2[x] = d1[x]
 
-def hardeval(tree, symlist = None, comma_mode = tuple):
-	return f(evaluate(tree, symlist, comma_mode))
+def hardeval(tree, symlist = None, comma_mode = tuple, looped = False, func = False):
+	return f(evaluate(tree, symlist, comma_mode, looped, func))
 
-def _hardeval(tree, symlist = None, comma_mode = tuple):
-	return f(_evaluate(tree, symlist, comma_mode))
+def _hardeval(tree, symlist = None, comma_mode = tuple, looped = False, func = False):
+	return f(_evaluate(tree, symlist, comma_mode, looped, func))
 
-def _evaluate(tree, symlist = None, comma_mode = tuple):
-	sidelist = clone(symlist)
-	value = evaluate(tree, sidelist, comma_mode)
+def _evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = False):
+	sidelist = deepcopy(symlist)
+	value = evaluate(tree, sidelist, comma_mode, looped, func)
 	merge(sidelist, symlist)
 	return value
 
-def evaluate(tree, symlist = None, comma_mode = tuple):
+def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = False):
 	if not isinstance(tree, parser.ASTNode):
 		return tree
 	symlist = symlist or default
@@ -197,49 +223,61 @@ def evaluate(tree, symlist = None, comma_mode = tuple):
 			symlist[tree.token.content] = args[0]
 		return Identifier(tree.token.content, getter, setter)
 	elif tree.token.content == 'unless':
-		if hardeval(tree.children[1], symlist):
-			_evaluate(tree.children[2], symlist)
+		if hardeval(tree.children[1], symlist, looped = looped, func = func):
+			_evaluate(tree.children[2], symlist, looped = looped, func = func)
 		else:
-			_evaluate(tree.children[0], symlist)
+			_evaluate(tree.children[0], symlist, looped = looped, func = func)
 	elif tree.token.content == 'if':
-		if hardeval(tree.children[0], symlist):
-			_evaluate(tree.children[1], symlist)
+		if hardeval(tree.children[0], symlist, looped = looped, func = func):
+			return _evaluate(tree.children[1], symlist, looped = looped, func = func)
 		elif len(tree.children) > 2:
-			_evaluate(tree.children[2], symlist)
+			return _evaluate(tree.children[2], symlist, looped = looped, func = func)
 	elif tree.token.content == 'while':
 		if 'whileas' in treetype:
-			sidelist = clone(symlist)
-			value = hardeval(tree.children[0], sidelist)
+			sidelist = deepcopy(symlist)
+			value = hardeval(tree.children[0], sidelist, looped = looped, func = func)
 			while value:
-				assign(evaluate(tree.children[1], sidelist), value)
-				evaluate(tree.children[2], sidelist)
-				value = hardeval(tree.children[0], sidelist)
-			del sidelist[evaluate(tree.children[1]).name]
+				assign(evaluate(tree.children[1], sidelist), value, looped = looped, func = func)
+				result = evaluate(tree.children[2], sidelist, looped = looped, func = func)
+				if isinstance(result, Statement):
+					if result.name == 'break': break
+					if result.name == 'continue': continue
+				value = hardeval(tree.children[0], sidelist, looped = looped, func = func)
+			del sidelist[evaluate(tree.children[1], looped = looped, func = func).name]
 			merge(sidelist, symlist)
 		else:
-			while hardeval(tree.children[0], symlist):
-				_evaluate(tree.children[1], symlist)
+			while hardeval(tree.children[0], symlist, looped = looped, func = func):
+				result = _evaluate(tree.children[1], symlist, looped = looped, func = func)
+				if isinstance(result, Statement):
+					if result.name == 'break': break
+					if result.name == 'continue': continue
 	elif tree.token.content == 'for':
 		if 'foreach' in treetype:
-			sidelist = clone(symlist)
-			for val in hardeval(tree.children[1], sidelist):
-				assign(evaluate(tree.children[0], sidelist), val)
-				evaluate(tree.children[2], sidelist)
-			del sidelist[evaluate(tree.children[0]).name]
+			sidelist = deepcopy(symlist)
+			for val in hardeval(tree.children[1], sidelist, looped = looped, func = func):
+				assign(evaluate(tree.children[0], sidelist, looped = looped, func = func), val)
+				result = evaluate(tree.children[2], sidelist, looped = True, func = func)
+				if isinstance(result, Statement):
+					if result.name == 'break': break
+					if result.name == 'continue': continue
+			del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
 			merge(sidelist, symlist)
 		else:
-			sidelist = clone(symlist)
-			evaluate(tree.children[0], sidelist)
-			while not tree.children[1].children or hardeval(tree.children[1], sidelist):
-				evaluate(tree.children[-1], sidelist)
-				if len(tree.children) >= 4: evaluate(tree.children[2], sidelist)
+			sidelist = deepcopy(symlist)
+			evaluate(tree.children[0], sidelist, looped = looped, func = func)
+			while not tree.children[1].children or hardeval(tree.children[1], sidelist, looped = looped, func = func):
+				result = evaluate(tree.children[-1], sidelist, looped = looped, func = func)
+				if isinstance(result, Statement):
+					if result.name == 'break': break
+					if result.name == 'continue': continue
+				if len(tree.children) >= 4: evaluate(tree.children[2], sidelist, looped = looped, func = func)
 	elif tree.token.content == 'try':
 		try:
-			_hardeval(tree.children[0], symlist)
+			_hardeval(tree.children[0], symlist, looped = looped, func = func)
 		except Exception as e:
-			sidelist = clone(symlist)
-			assign(evaluate(tree.children[1], sidelist), e)
-			evaluate(tree.children[2], sidelist)
+			sidelist = deepcopy(symlist)
+			assign(evaluate(tree.children[1], sidelist), e, looped = looped, func = func)
+			evaluate(tree.children[2], sidelist, looped = looped, func = func)
 	elif 'binary_operator' in tokentype or 'binary_RTL' in tokentype:
 		if tree.token.content in infix_operators:
 			return infix_operators[tree.token.content](tree.children[0], tree.children[1], symlist)
@@ -255,41 +293,58 @@ def evaluate(tree, symlist = None, comma_mode = tuple):
 			return postfix_operators[tree.token.content](tree.children[0], symlist)
 		else:
 			raise NotImplementedError(tree.token.content + ' not yet implemented')
-	elif tree.token.content == 'exist':
+	elif tree.token.content == 'import':
+		_import(tree.children[0], symlist)
+	elif tree.token.content in ['exist', 'exists']:
 		return exists(tree.children[0], symlist)
+	elif tree.token.content in ['exist not', 'exists not']:
+		return not exists(tree.children[0], symlist)
+	elif 'break_statement' in treetype:
+		if looped:
+			return Statement('break')
+		else:
+			raise SyntaxError('break outside of loop')
+	elif 'continue_statement' in treetype:
+		if looped:
+			return Statement('continue')
+		else:
+			raise SyntaxError('continue outside of loop')
 	elif 'comma_expr' in treetype:
-		return comma_mode([evaluate(child, symlist) for child in tree.children])
+		return comma_mode([evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
 	elif 'bracket_expr' in treetype:
 		if 'opfunc' in treetype:
 			return Function(lambda *args, **kwargs: infix_operators[tree.children[0].token.content](*(args + (symlist,)), **kwargs), False)
 		if 'bracket' in treetype:
-				return evaluate(tree.children[0], symlist, tuple)
+				return evaluate(tree.children[0], symlist, tuple, looped = looped, func = func)
 		elif 'list' in treetype:
 			if tree.children:
-				result = evaluate(tree.children[0], symlist, list)
+				result = evaluate(tree.children[0], symlist, list, looped = looped, func = func)
 				if not isinstance(result, list): result = [result]
 				return result
 			return []
 		elif 'codeblock' in treetype:
-			sidelist = clone(symlist)
+			sidelist = deepcopy(symlist)
 			for statement in tree.children:
-				evaluate(statement, sidelist)
+				result = evaluate(statement, sidelist, looped = looped, func = func)
+				if isinstance(result, Statement):
+					merge(sidelist, symlist)
+					return result
 			merge(sidelist, symlist)
 	elif tree.token.type == 'ternary':
-		return evaluate(tree.children[1], symlist) if hardeval(tree.children[0], symlist) else evaluate(tree.children[2], symlist)
+		return evaluate(tree.children[1], symlist, looped = looped, func = func) if hardeval(tree.children[0], symlist, looped = looped, func = func) else evaluate(tree.children[2], symlist, looped = looped, func = func)
 	elif 'call' in treetype:
 		if tree.children[0].token.content in ['eval']:
-			return hardeval(tree.children[0], symlist)(*([symlist] + [evaluate(child, symlist) for child in tree.children[1:]]))
+			return hardeval(tree.children[0], symlist, looped = looped, func = func)(*([symlist] + [evaluate(child, symlist, looped = looped, func = func) for child in tree.children[1:]]))
 		else:
-			return hardeval(tree.children[0], symlist)(*[evaluate(child, symlist) for child in tree.children[1:]])
+			return hardeval(tree.children[0], symlist, looped = looped, func = func)(*[evaluate(child, symlist, looped = looped, func = func) for child in tree.children[1:]])
 	elif 'getitem' in treetype:
 		def getter():
-			return hardeval(tree.children[0], symlist)[hardeval(tree.children[1], symlist)]
+			return hardeval(tree.children[0], symlist, looped = looped, func = func)[hardeval(tree.children[1], symlist, looped = looped, func = func)]
 		def setter(*args):
-			hardeval(tree.children[0], symlist)[hardeval(tree.children[1], symlist)] = args[0]
+			hardeval(tree.children[0], symlist, looped = looped, func = func)[hardeval(tree.children[1], symlist, looped = looped, func = func)] = args[0]
 		return Identifier('.getitem', getter, setter)
 	elif 'expression' in treetype:
-		return evaluate(tree.children[0], symlist)
+		return evaluate(tree.children[0], symlist, looped = looped, func = func)
 
 class Interpreter:
 	def __init__(self, tree):
