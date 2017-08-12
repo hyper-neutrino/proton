@@ -36,16 +36,17 @@ class LexerMatcher:
 		return self.skip(code, match)
 
 class RegexMatcher(LexerMatcher):
-	def __init__(self, regex, group, tokentype, processor = lambda x: x, **kwargs):
+	def __init__(self, regex, group, tokentype, processor = lambda x: x, offset = 0, **kwargs):
 		self.regex = regex
 		self.group = group
 		self.tokentype = tokentype
 		self.processor = processor
+		self.offset = offset
 		self.values = kwargs
 	def match(self, code):
 		return re.match(self.regex, code)
 	def get(self, code, match):
-		return (match.span()[1], Token(self.tokentype, self.processor(match.group(self.group)), **self.values))
+		return (match.span()[1] + self.offset, Token(self.tokentype, self.processor(match.group(self.group)), **self.values))
 	def skip(self, code, match):
 		return match.span()[1] * (self.group == -1)
 
@@ -109,14 +110,17 @@ binary_operators = [
 	('&',),
 	('|',),
 	('^',),
-	('&&', 'and'),
-	('||', 'or'),
-	('in', 'not in',),
 	('**=', '*=', '/=', '//=', '+=', '-=', '>>=', '<<=', '%=', '&=', '|=', '&&=', '||='),
 	('==', '!=', ':=', '=', '=:'),
+	('&&', 'and'),
+	('||', 'or'),
+	('in', 'not in', 'is', 'are', 'is not', 'are not'),
 ]
 
-unifix_operators = ['!', '++', '--', '~']
+prefix_operators = ['!', '++', '--', '~', '@', '$', '$$', '*']
+postfix_operators = ['!', '++', '--']
+
+unifix_operators = prefix_operators + postfix_operators
 
 def recurstr(array):
 	if isinstance(array, (map,)):
@@ -125,23 +129,29 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist', 'exist not', 'exists', 'exists not', 'break', 'continue', 'import', 'include', 'as', 'from']
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'speed of']
+
+ignore = ('not',)
 
 operators = sum(binary_operators, ()) + sum(binary_RTL, ()) + tuple(unifix_operators)
 
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
+	RegexMatcher(r'\d*\.\d+j', 0, 'literal:expression', complex),
+	RegexMatcher(r'\d+j', 0, 'literal:expression', complex),
 	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),
 	RegexMatcher(r'\d+', 0, 'literal:expression', int),
 	RegexMatcher(r'"([^"\\]|\\.)*"', 0, 'literal:expression', lambda x: ast.literal_eval('""%s""' % x)),
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
-	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
+	RegexMatcher('(%s)' % '|'.join(['(%s)\W' % keyword for keyword in keywords]), 1, 'keyword', lambda x: x[:-1], -1),
+	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators + ignore else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
 	RegexMatcher(r';', 0, 'statement'),
 	RegexMatcher(r',', 0, 'comma'),
 	RegexMatcher(r'\?', 0, 'ternary'),
+	RegexMatcher(r':>', 0, 'maparrow'),
 	RegexMatcher(r'->', 0, 'arrow'),
 	RegexMatcher(r'=>', 0, 'lambda'),
 	oper_matcher(operators, [('unifix_operator', unifix_operators), ('binary_RTL', sum(binary_RTL, ())), ('binary_operator', sum(binary_operators, ()))]),
