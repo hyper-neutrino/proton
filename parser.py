@@ -213,6 +213,8 @@ matchers = [
 ] + [
 	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', tuple(elem for elem in row if elem not in special)), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')) for row in lexer.binary_operators
 ] + [
+	PatternMatcher([('expression',), ('keyword', 'keyword', name), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('keyword')) for name in ['from', 'as']
+] + [
 	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
 	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr/expression'))
 ] + [
@@ -224,8 +226,6 @@ matchers = [
 	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exists')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
 	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exist not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
 	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exists not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
-] + [
-	PatternMatcher([('expression',), ('keyword', 'keyword', name), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('keyword')) for name in ['from', 'as']
 ] + [
 	PatternMatcher([('keyword', 'keyword', 'import'), ('expression',)], lambda x, y: x.addChild(y).addType('expression').rmType('keyword'))
 ] + [
