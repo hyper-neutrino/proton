@@ -275,7 +275,8 @@ default['eval'] = Function(lambda s, x: complete(parser.parse(lexer.tokenize(x))
 def merge(d1, d2):
 	for x in d1:
 		if x in d2 or x.startswith('!'):
-			d2[x] = d1[x]
+			if d1[x] != d2[x]:
+				d2[x] = d1[x]
 
 def indices(array, ref, symlist):
 	reftype = ref.type.split('/')
@@ -382,6 +383,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 					if result.name == 'break': break
 					if result.name == 'continue': continue
 				if len(tree.children) >= 4: evaluate(tree.children[2], sidelist, looped = looped, func = func)
+			merge(sidelist, symlist)
 	elif tree.token.content == 'try':
 		try:
 			_hardeval(tree.children[0], symlist, looped = looped, func = func)

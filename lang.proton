@@ -27,3 +27,9 @@ str = object => {
 		pystr(object)
 	}
 }
+
+pyprint = print
+
+print = *arguments => {
+	pyprint(*map(str, arguments))
+}

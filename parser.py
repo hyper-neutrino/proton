@@ -239,7 +239,7 @@ matchers = [
 ] + [
 	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True)
 ] + [
-	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('statement', 'statement', ';')], lambda x, y: x.addType('statement'))
+	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('statement', 'statement', ';')], lambda x, y: x.addType('statement').rmType('expression'))
 ] + [
 	PatternMatcher([(('expression'),), keyword('exist')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
 	PatternMatcher([(('expression'),), keyword('exists')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),

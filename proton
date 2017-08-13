@@ -29,6 +29,8 @@ flags = {
 	'-h': (0, lambda s: showhelp(), help)
 }
 
+interpreter.setPath(('/' in sys.argv[0]) and sys.argv[0][:sys.argv[0].rfind('/')] or '')
+
 if __name__ == '__main__':
 	sys.setrecursionlimit(100000)
 	symlist = {x: interpreter.default[x] for x in interpreter.default}
@@ -49,7 +51,6 @@ if __name__ == '__main__':
 			flag = arg
 		elif code is None:
 			code = open(arg, 'r').read()
-			interpreter.setPath(('/' in arg) and arg[:arg.rfind('/')] or '')
 		else:
 			args.append(arg)
 	if flag is not None:
@@ -63,7 +64,6 @@ if __name__ == '__main__':
 		except:
 			print(traceback.format_exc(limit = limit))
 	else:
-		interpreter.setPath('')
 		lang = interpreter.include('lang')
 		for i in lang:
 			symlist[i] = lang[i]
