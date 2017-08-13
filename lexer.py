@@ -147,7 +147,7 @@ matchers = [
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
-	RegexMatcher('(%s)' % '|'.join(['(%s)\W' % keyword for keyword in keywords]), 1, 'keyword', lambda x: x[:-1], -1),
+	RegexMatcher('(%s)' % '|'.join(['(%s)[^A-Za-z_]' % keyword for keyword in keywords]), 1, 'keyword', lambda x: x[:-1], -1),
 	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators + ignore else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
 	RegexMatcher(r';', 0, 'statement'),
 	RegexMatcher(r',', 0, 'comma'),
