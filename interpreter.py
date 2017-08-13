@@ -107,7 +107,16 @@ def subref(x, y, z):
 			f(x)[y] = args[0]
 	return Identifier('', getter, setter)
 
+def walk(x):
+	if hasattr(x, '__iter__') and not isinstance(x, str):
+		result = []
+		for y in x:
+			result += walk(y)
+		return result
+	return [x]
+
 def assign(x, y):
+	if not all(isinstance(node, Identifier) for node in walk(x)): return assign(y, x)
 	if hasattr(x, '__iter__'):
 		if hasattr(y, '__iter__'):
 			if len(x) < len(y):
