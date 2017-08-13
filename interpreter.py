@@ -89,10 +89,10 @@ def _s(op):
 	return inner
 
 def _(op):
-	return lambda x, y, z: _s(op)(evaluate(x, z), evaluate(y, z))
+	return lambda x, y, z: _s(op)(f(evaluate(x, z)), f(evaluate(y, z)))
 
 def __(op):
-	return lambda x, y, z: (lambda k, j: k(_s(op)(k, j)))(evaluate(x, z), evaluate(y, z))
+	return lambda x, y, z: (lambda k, j: k(_s(op)(k, j)))(evaluate(x, z), f(evaluate(y, z)))
 
 def subref(x, y, z):
 	x, y = evaluate(x, z), evaluate(y, z)
