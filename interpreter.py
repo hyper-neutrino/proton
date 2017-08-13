@@ -469,7 +469,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 					args.append(evaluate(argument, symlist, looped = looped, func = func))
 			return f(evaluate(tree.children[0], symlist, looped = looped, func = func))(*args)
 	elif 'getitem' in treetype:
-		if 'comma_expr' in tree.children[0].type.split('/') or 'slice' in tree.children[0].type.split('/'):
+		if 'comma_expr' in tree.children[1].type.split('/') or 'slice' in tree.children[1].type.split('/'):
 			array = f(evaluate(tree.children[0], symlist, looped = looped, func = func))
 			index_list = indices(array, tree.children[1], symlist)
 			def getter():
