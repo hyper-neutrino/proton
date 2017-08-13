@@ -209,15 +209,16 @@ matchers = [
 	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'colon' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('foriter')),
 	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'arrow' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('whilearrow')),
 ] + [
-	PatternMatcher([('expression',), ('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.postfix_operators if elem not in special))], lambda x, y: y.addChild(x).addType('postfix/expression').rmType('unifix_operator')),
-	PatternMatcher([('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.prefix_operators if elem not in special)), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
-] + [
 	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', tuple(elem for elem in row if elem not in special)), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True) for row in lexer.binary_RTL
 ] + [
 	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', tuple(elem for elem in row if elem not in special)), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')) for row in lexer.binary_operators
 ] + [
+	PatternMatcher([('expression',), ('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.postfix_operators if elem not in special))], lambda x, y: y.addChild(x).addType('postfix/expression').rmType('unifix_operator')),
+	PatternMatcher([('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.prefix_operators if elem not in special)), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
+	PatternMatcher([('binary_operator', 'binary_operator', '*'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator')),
+] + [
 	PatternMatcher([('binary_operator', 'binary_operator', '-'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator'))
-]+ [
+] + [
 	PatternMatcher([('expression',), keyword(name), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('keyword')) for name in ['from', 'as']
 ] + [
 	PatternMatcher([('expression',), keyword('to'), ('expression',), keyword('by'), ('expression',)], lambda v, w, x, y, z: ASTNode(lexer.Token('slice/expression', ''), [v, x, z])),
@@ -269,7 +270,7 @@ matchers = [
 	], RTL = True)
 ] + [
 	PatternMatcher([('unifix_operator', 'unifix_operator', '@'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
-	PatternMatcher([('keyword', 'keyword', 'speed of'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword'))
+	PatternMatcher([('keyword', 'keyword', 'timeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword'))
 ]
 
 def parse(tokens):

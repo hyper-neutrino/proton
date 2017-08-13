@@ -226,7 +226,7 @@ prefix_operators = {
 	'@': ___(lambda x: x.setCaching(True)),
 	'$': ___(lambda x: x.wipeCache()),
 	'$$': ___(lambda x: x.setCaching(False).wipeCache()),
-	'speed of': lambda x, s: elapsed(lambda: evaluate(x, s)),
+	'timeof': lambda x, s: elapsed(lambda: evaluate(x, s)),
 }
 
 postfix_operators = {

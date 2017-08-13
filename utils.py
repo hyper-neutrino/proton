@@ -86,8 +86,8 @@ class Function:
 		self.cache = cache
 		return self
 	def wipeCache(self):
-		keys[self.id] = []
-		vals[self.id] = []
+		keys[fkey.index(self.function)] = []
+		vals[fkey.index(self.function)] = []
 		return self
 
 IDENT = None

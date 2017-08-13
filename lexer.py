@@ -1,4 +1,4 @@
-import re, ast, sys
+import re, ast, sys, sympy
 
 from errors import *
 from utils import *
@@ -117,7 +117,7 @@ binary_operators = [
 	('in', 'not in', 'is', 'are', 'is not', 'are not'),
 ]
 
-prefix_operators = ['!', '++', '--', '~', '@', '$', '$$', '*']
+prefix_operators = ['!', '++', '--', '~', '@', '$', '$$']
 postfix_operators = ['!', '++', '--']
 
 unifix_operators = prefix_operators + postfix_operators
@@ -129,7 +129,7 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'speed of']
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof']
 
 ignore = ('not',)
 
@@ -140,6 +140,7 @@ matchers = [
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
 	RegexMatcher(r'\d*\.\d+j', 0, 'literal:expression', complex),
 	RegexMatcher(r'\d+j', 0, 'literal:expression', complex),
+	RegexMatcher(r'\d+\s*/\s*\d+', 0, 'literal:expression', sympy.Rational),
 	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),
 	RegexMatcher(r'\d+', 0, 'literal:expression', int),
 	RegexMatcher(r'"([^"\\]|\\.)*"', 0, 'literal:expression', lambda x: ast.literal_eval('""%s""' % x)),
