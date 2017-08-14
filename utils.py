@@ -1,5 +1,5 @@
-def FT(key):
-	print (key)
+def FT(key, function = lambda x: x):
+	print(function(key))
 	return key
 
 def cando(function):
@@ -91,10 +91,15 @@ class Function:
 		return self
 
 IDENT = None
+EVALP = None
 
 def setident(ident):
 	global IDENT
 	IDENT = ident
+
+def setevalp(evalp):
+	global EVALP
+	EVALP = evalp
 
 def g(x):
 	if isinstance(x, (type(type), type(print), type(lambda: 0))):
@@ -111,5 +116,33 @@ def f(x):
 			return x
 		except:
 			return g(x)
+	elif isinstance(x, str):
+		return h(x)
 	else:
 		return g(x)
+
+def h(x):
+	result = ''
+	index = 0
+	while index < len(x):
+		if x[index] == '\\':
+			result += x[index + 1]
+			index += 1
+		elif x[index] == '#':
+			if x[index + 1] == '{':
+				string = ''
+				index += 2
+				while x[index] != '}':
+					if x[index] == '\\':
+						string += x[index + 1]
+						index += 1
+					else:
+						string += x[index]
+					index += 1
+				result += str(EVALP(string))
+			else:
+				result += '#'
+		else:
+			result += x[index]
+		index += 1
+	return result

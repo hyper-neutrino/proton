@@ -1,31 +1,17 @@
-cardinal = num => {
+ordinal = num => {
 	string = str(num)
 	num %= 100
 	if num % 10 == 1 and num != 11 string += 'st'
 	else if num % 10 == 2 and num != 12 string += 'nd'
 	else if num % 10 == 3 and num != 13 string += 'rd'
 	else string += 'th'
-	string
+	return string
 }
 
 map = function, list => {
 	result = []
 	for value : list result.append(function(value))
-	result
-}
-
-pystr = str
-
-str = object => {
-	if object is dict {
-		result = []
-		for key : object {
-			result.append(ascii(key) + ' :> ' + ascii(object[key]))
-		}
-		'[' + ', '.join(sorted(result)) + ']'
-	} else {
-		pystr(object)
-	}
+	return result
 }
 
 pyprint = print

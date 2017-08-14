@@ -78,7 +78,7 @@ if __name__ == '__main__':
 				print('\b\bKeyboardInterrupt')
 			try:
 				result = interpreter.complete(parser.parse(lexer.tokenize(code)), symlist)[0]
-				if result is not None: print(result)
+				if result is not None: print(interpreter.proton_str(result))
 				code = ''
 			except (UnclosedBracketError, UnclosedStringError):
 				pass

@@ -198,13 +198,13 @@ def keyword(name):
 matchers = [
 	PatternMatcher([('bracket', 'bracket', '('), (('binary_operator', 'binary_RTL'),), ('bracket', 'bracket', ')')], lambda x, y, z: x.addChild(y).addType('opfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent(''))
 ] + [
+	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
+] + [
 	MultiTypeMatch([
 		PatternMatcher([('expression', lambda x: 'literal' not in x), (lambda x: 'bracket_expr' in x and 'bracket' in x,)], lambda x, y: ASTNode(lexer.Token('call/expression', ''), [x] + (y.children[0].children if y.children and y.children[0].token.type == 'comma' else y.children))),
 		PatternMatcher([('expression',), ('list',)], lambda x, y: ASTNode(lexer.Token('getitem/expression', ''), [x, ASTNode(lexer.Token('expression/comma_expr', ''), y.children[0].children) if y.children and y.children[0].token.type == 'comma' else y.children[0]])),
-		PatternMatcher([('expression',), ('binary_operator', 'binary_operator', '.'), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator'))
+		PatternMatcher([('expression',), ('binary_operator', 'binary_operator', '.'), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')),
 	])
-] + [
-	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
 ] + [
 	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'colon' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('foriter')),
 	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'arrow' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('whilearrow')),
@@ -234,24 +234,7 @@ matchers = [
 	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
 	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr/expression'))
 ] + [
-	PatternMatcher([('expression',), ('ternary',), ('expression',), ('colon',), ('expression',)], lambda v, w, x, y, z: w.addChildren([v, x, z]).addType('expression').rmType('ternary')),
-	PatternMatcher([('expression',), ('lambda',), (('expression', 'statement'),)], lambda x, y, z: y.addChild(x).addChild(z).setType('anonfunc/expression'), RTL = True),
-	PatternMatcher([('lambda',), (('expression', 'statement'),)], lambda y, z: y.addChild(None).addChild(z).setType('anonfunc/expression'), RTL = True),
-] + [
-	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True)
-] + [
-	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('statement', 'statement', ';')], lambda x, y: x.addType('statement').rmType('expression'))
-] + [
-	PatternMatcher([(('expression'),), keyword('exist')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
-	PatternMatcher([(('expression'),), keyword('exists')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
-	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exist not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
-	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exists not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
-] + [
-	PatternMatcher([keyword('import'), ('expression',)], lambda x, y: x.addChild(y).addType('expression').rmType('keyword')),
-	PatternMatcher([keyword('include'), ('expression',)], lambda x, y: x.addChild(y).addType('expression').rmType('keyword'))
-] + [
-	PatternMatcher([keyword('break')], lambda x: x.setType('break_statement/expression')),
-	PatternMatcher([keyword('continue')], lambda x: x.setType('continue_statement/expression'))
+	PatternMatcher([('expression',), ('ternary',), ('expression',), ('colon',), ('expression',)], lambda v, w, x, y, z: w.addChildren([v, x, z]).addType('expression').rmType('ternary'))
 ] + [
 	MultiTypeMatch([
 		PatternMatcher([keyword('for'), ('expression',), ('colon',), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement/foreach').rmType('keyword')),
@@ -267,10 +250,29 @@ matchers = [
 		PatternMatcher([keyword('else'), (('expression', 'statement'),)], lambda x, y: x.addChild(y).addType('statement').rmType('keyword')),
 		PatternMatcher([('statement', 'keyword', 'if'), ('statement', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
 		PatternMatcher([keyword('try'), (('expression', 'statement'),), keyword('except'), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement').rmType('keyword')),
+		PatternMatcher([('expression',), ('lambda',), (('expression', 'statement'),)], lambda x, y, z: y.addChild(x).addChild(z).setType('anonfunc/expression')),
 	], RTL = True)
 ] + [
+	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True)
+] + [
+	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('semicolon', 'semicolon', ';')], lambda x, y: x.addType('statement').rmType('expression').rmType('semicolon'))
+] + [
+	PatternMatcher([(('expression'),), keyword('exist')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
+	PatternMatcher([(('expression'),), keyword('exists')], lambda x, y: y.addChild(x).addType('expression/exist').rmType('keyword')),
+	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exist not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
+	PatternMatcher([(('expression'),), ('keyword', 'keyword', 'exists not')], lambda x, y: y.addChild(x).addType('expression/notexist').rmType('keyword')),
+] + [
+	PatternMatcher([keyword('import'), ('expression',)], lambda x, y: x.addChild(y).addType('expression').rmType('keyword')),
+	PatternMatcher([keyword('include'), ('expression',)], lambda x, y: x.addChild(y).addType('expression').rmType('keyword'))
+] + [
+	PatternMatcher([keyword('break')], lambda x: x.setType('break_statement/expression')),
+	PatternMatcher([keyword('continue')], lambda x: x.setType('continue_statement/expression'))
+] + [
 	PatternMatcher([('unifix_operator', 'unifix_operator', '@'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
-	PatternMatcher([('keyword', 'keyword', 'timeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword'))
+	PatternMatcher([keyword('timeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword'))
+] + [
+	PatternMatcher([keyword('return'), ('expression',)], lambda x, y: x.addChild(y).addType('return_statement').rmType('keyword')),
+	PatternMatcher([keyword('return')], lambda x: x.addChild(None).addType('return_statement').rmType('keyword'))
 ]
 
 def parse(tokens):

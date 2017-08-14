@@ -95,16 +95,16 @@ def __(op):
 	return lambda x, y, z: (lambda k, j: k(_s(op)(k, j)))(evaluate(x, z), f(evaluate(y, z)))
 
 def subref(x, y, z):
-	x, y = evaluate(x, z), evaluate(y, z)
+	x, y = f(evaluate(x, z)), evaluate(y, z)
 	ident = isinstance(y, Identifier)
 	y = y.name if ident else y
 	def getter():
-		return getattr(f(x), y) if ident and hasattr(f(x), y) else f(x)[y]
+		return getattr(x, y) if ident and hasattr(x, y) else x[y]
 	def setter(*args):
-		if ident and hasattr(f(x), y):
-			setattr(f(x), y, args[0])
+		if ident and hasattr(x, y):
+			setattr(x, y, args[0])
 		else:
-			f(x)[y] = args[0]
+			x[y] = args[0]
 	return Identifier('', getter, setter)
 
 def walk(x):
@@ -226,6 +226,58 @@ def elapsed(gen):
 	gen()
 	return time.time() - start
 
+def get_index(array, index):
+	if isinstance(array, int):
+		return int(bool(array & (1 << index)))
+	else:
+		return array[index]
+
+def set_index(reference, array, index, value):
+	if isinstance(array, int):
+		if get_index(array, index) and not value:
+			array -= array & (1 << index)
+		elif not get_index(array, index) and value:
+			array += array & (1 << index)
+		return reference(array)
+	elif isinstance(array, str):
+		return reference(array[:index] + value + array[index + 1:])
+	else:
+		array[index] = value
+		return array
+
+def get_indices(array, indices):
+	if isinstance(array, int):
+		result = 0
+		for index in indices:
+			result |= (array & (1 << index))
+		return result
+	else:
+		if isinstance(array, str):
+			return ''.join(array[index] for index in indices)
+		else:
+			return type(array)(array[index] for index in indices)
+
+class DEL:
+	def __init__(self):
+		pass
+	def __eq__(self, other):
+		return isinstance(other, DEL)
+	def __ne__(self, other):
+		return not isinstance(other, DEL)
+
+def set_indices(reference, array, indices, values):
+	for index, value in zip(indices, list(values)):
+		array = set_index(reference, array, index, value)
+	s = isinstance(array, str)
+	if s: array = list(array)
+	for index in indices[len(values):]:
+		array = set_index(reference, array, index, DEL())
+	if isinstance(reference, Identifier):
+		if s:
+			return reference(''.join(filter(DEL().__ne__, array)))
+		else:
+			return reference(type(array)(filter(DEL().__ne__, array)))
+
 prefix_operators = {
 	'!': ___(operator.not_),
 	'~': ___(operator.invert),
@@ -245,8 +297,9 @@ postfix_operators = {
 }
 
 class Statement:
-	def __init__(self, name):
+	def __init__(self, name, value = None):
 		self.name = name
+		self.value = value
 
 class Identifier:
 	def __init__(self, name, getter, setter):
@@ -279,7 +332,17 @@ for name in dir(builtins):
 	except:
 		pass
 
+def proton_str(obj):
+	if isinstance(obj, dict):
+		return '[%s]' % ', '.join(sorted([ascii(key) + ' :> ' + ascii(obj[key]) for key in obj]))
+	elif isinstance(obj, Function):
+		return proton_str(obj.function)
+	else:
+		return str(obj)
+
 default['eval'] = Function(lambda s, x: complete(parser.parse(lexer.tokenize(x)), s))
+default['Function'] = Function
+default['str'] = proton_str
 
 def merge(d1, d2):
 	for x in d1:
@@ -332,6 +395,7 @@ def _evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = F
 def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = False):
 	if not isinstance(tree, parser.ASTNode):
 		return tree
+	setevalp(lambda k: complete(parser.parse(lexer.tokenize(k)), symlist = symlist or default)[0])
 	symlist = symlist or default
 	treetype = tree.type.split('/')
 	tokentype = tree.token.type.replace(':', '/').split('/')
@@ -363,6 +427,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
+					if result.name == 'return': return result.value
 				value = hardeval(tree.children[0], sidelist, looped = looped, func = func)
 			del sidelist[evaluate(tree.children[1], looped = looped, func = func).name]
 			merge(sidelist, symlist)
@@ -372,6 +437,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
+					if result.name == 'return': return result.value
 	elif tree.token.content == 'for':
 		if 'foreach' in treetype:
 			sidelist = clone_scope(symlist)
@@ -381,6 +447,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
+					if result.name == 'return': return result.value
 			del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
 			merge(sidelist, symlist)
 		else:
@@ -391,6 +458,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
+					if result.name == 'return': return result.value
 				if len(tree.children) >= 4: evaluate(tree.children[2], sidelist, looped = looped, func = func)
 			merge(sidelist, symlist)
 	elif tree.token.content == 'try':
@@ -433,6 +501,11 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			return Statement('continue')
 		else:
 			raise SyntaxError('continue outside of loop')
+	elif 'return_statement' in treetype:
+		if func:
+			return Statement('return', f(evaluate(tree.children[0], symlist)))
+		else:
+			raise SyntaxError('return outside of function')
 	elif 'comma_expr' in treetype:
 		return comma_mode([evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
 	elif 'mapping' in treetype:
@@ -457,9 +530,10 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			sidelist = clone_scope(symlist)
 			result = None
 			for statement in tree.children:
-				result = evaluate(statement, sidelist, looped = looped, func = func)
+				result = evaluate(statement, sidelist, looped = looped, func = True)
 				if isinstance(result, Statement):
 					merge(sidelist, symlist)
+					if result.name == 'return': return result.value
 					return result
 			merge(sidelist, symlist)
 			return result
@@ -479,31 +553,30 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			return f(evaluate(tree.children[0], symlist, looped = looped, func = func))(*args)
 	elif 'getitem' in treetype:
 		if 'comma_expr' in tree.children[1].type.split('/') or 'slice' in tree.children[1].type.split('/'):
-			array = f(evaluate(tree.children[0], symlist, looped = looped, func = func))
+			ref = evaluate(tree.children[0], symlist, looped = looped, func = func)
+			array = f(ref)
 			index_list = indices(array, tree.children[1], symlist)
 			def getter():
-				if type(array) == str:
-					return ''.join(array[index] for index in index_list)
-				else:
-					return type(array)(array[index] for index in index_list)
+				return get_indices(array, index_list)
 			def setter(*args):
-				args = args[0]
-				for index in range(min(len(index_list), len(args))):
-					array[index_list[index]] = args[index]
+				set_indices(ref, array, index_list, args[0])
 			return Identifier('.getitem', getter, setter)
 		else:
-			array = f(evaluate(tree.children[0], symlist, looped = looped, func = func))
+			ref = evaluate(tree.children[0], symlist, looped = looped, func = func)
+			array = f(ref)
 			index = f(hardeval(tree.children[1], symlist))
 			def getter():
-				return array[index]
+				return get_index(array, index)
 			def setter(*args):
-				array[index] = args[0]
+				set_index(ref, array, index, args[0])
 			return Identifier('.getitem', getter, setter)
 	elif 'anonfunc' in treetype:
 		def inner(*values):
 			scope = clone_scope(symlist)
 			assign_method_parameters(values, tree.children[0], scope)
-			return f(hardeval(tree.children[1], scope))
+			value = f(hardeval(tree.children[1], scope, func = True))
+			merge(scope, symlist)
+			return value
 		return Function(inner)
 	elif 'expression' in treetype:
 		return evaluate(tree.children[0], symlist, looped = looped, func = func)
@@ -520,3 +593,6 @@ class Interpreter:
 
 def complete(tree, symlist = None):
 	return Interpreter(tree).interpret(symlist)
+
+def full(code, symlist = None):
+	return complete(parser.parse(lexer.tokenize(code)), symlist = symlist)

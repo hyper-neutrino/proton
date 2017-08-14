@@ -1,4 +1,4 @@
-import re, ast, sys, sympy
+import re, ast, sys
 
 from errors import *
 from utils import *
@@ -24,12 +24,13 @@ class Token:
 		return isinstance(other, Token) and other.type == self.type and other.content == self.content
 
 class LexerMatcher:
-	def __init__(self, matcher, getter, skip = lambda *a: 0):
+	def __init__(self, matcher, getter, getlast = False, skip = lambda *a: 0):
 		self.matcher = matcher
 		self.getter = getter
 		self.skip = skip
-	def match(self, code):
-		return self.matcher(code)
+		self.getlast = getlast
+	def match(self, *code_or_last):
+		return self.matcher(*code_or_last)
 	def get(self, code, match):
 		return self.getter(code, match)
 	def skip(self, code, match):
@@ -43,6 +44,7 @@ class RegexMatcher(LexerMatcher):
 		self.processor = processor
 		self.offset = offset
 		self.values = kwargs
+		self.getlast = False
 	def match(self, code):
 		return re.match(self.regex, code)
 	def get(self, code, match):
@@ -54,6 +56,7 @@ class ErrorMatcher(LexerMatcher):
 	def __init__(self, matcher, errortype):
 		self.matcher = matcher
 		self.errortype = errortype
+		self.getlast = False
 	def match(self, code):
 		return self.matcher.match(code)
 	def get(self, code, match):
@@ -75,23 +78,26 @@ class Lexer:
 		self.rules = rules
 		self.code = code
 		self.index = 0
+		self.last = None
 	def __iter__(self):
 		return self
 	def __next__(self):
 		if self.index >= len(self.code): raise StopIteration
 		for rule in self.rules:
 			code = self.code[self.index:]
-			match = rule.match(code)
+			match = rule.match(code, self.last) if rule.getlast else rule.match(code)
 			if match:
 				skip = rule.skip(code, match)
 				if skip:
 					self.index += skip
-					return self.__next__()
+					self.last = self.__next__()
+					return self.last
 				else:
 					token = rule.get(code, match)
 					if token is not None:
 						self.index += token[0]
-						return token[1]
+						self.last = token[1]
+						return self.last
 		raise RuntimeError('Unknown token at index %d: "...%s..."' % (self.index, self.code[self.index:][:10].replace('\n', '\\n')))
 
 binary_RTL = [
@@ -129,27 +135,44 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof']
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof', 'return']
 
 ignore = ('not',)
 
 operators = sum(binary_operators, ()) + sum(binary_RTL, ()) + tuple(unifix_operators)
 
+def flags(key):
+	flag = 0
+	if 'a' in key:
+		flag += re.ASCII
+	if 'i' in key:
+		flag += re.IGNORECASE
+	if 'l' in key:
+		flag += re.LOCALE
+	if 'm' in key:
+		flag += re.MULTILINE
+	if 's' in key:
+		flag += re.DOTALL
+	if 'x' in key:
+		flag += re.VERBOSE
+	return flag
+
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
+	LexerMatcher(lambda code, last: None if last and 'operator' in last.type else re.match(r'/(([^/\\]|\\.)*)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and 'operator' in last.type else re.match(r'/(([^/\\]|\\.)*)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
 	RegexMatcher(r'\d*\.\d+j', 0, 'literal:expression', complex),
 	RegexMatcher(r'\d+j', 0, 'literal:expression', complex),
-	RegexMatcher(r'\d+\s*/\s*\d+', 0, 'literal:expression', sympy.Rational),
 	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),
-	RegexMatcher(r'\d+', 0, 'literal:expression', sympy.Integer),
+	RegexMatcher(r'\d+', 0, 'literal:expression', int),
 	RegexMatcher(r'"([^"\\]|\\.)*"', 0, 'literal:expression', lambda x: ast.literal_eval('""%s""' % x)),
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
 	ErrorMatcher(RegexMatcher(r"'([^'\\]|\\.)*", 0, ''), UnclosedStringError),
 	RegexMatcher('(%s)' % '|'.join(['(%s)[^A-Za-z_]' % keyword for keyword in keywords]), 1, 'keyword', lambda x: x[:-1], -1),
 	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators + ignore else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
-	RegexMatcher(r';', 0, 'statement'),
+	RegexMatcher(r';', 0, 'semicolon'),
 	RegexMatcher(r',', 0, 'comma'),
 	RegexMatcher(r'\?', 0, 'ternary'),
 	RegexMatcher(r':>', 0, 'maparrow'),
