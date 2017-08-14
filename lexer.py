@@ -157,11 +157,21 @@ def flags(key):
 		flag += re.VERBOSE
 	return flag
 
+def intify(base):
+	def inner(string):
+		left, right = re.split('[^0-9]', string, 1)
+		return int(right, base) * (base ** int(left))
+	return inner
+
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
 	LexerMatcher(lambda code, last: None if last and 'operator' in last.type else re.match(r'/(([^/\\]|\\.)*)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
 	LexerMatcher(lambda code, last: None if last and 'operator' in last.type else re.match(r'/(([^/\\]|\\.)*)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
+	RegexMatcher(r'\d+b[01]+', 0, 'literal:expression', intify(2)),
+	RegexMatcher(r'\d+o[0-7]+', 0, 'literal:expression', intify(8)),
+	RegexMatcher(r'\d+x[0-9a-fA-F]+', 0, 'literal:expression', intify(16)),
+	RegexMatcher(r'\d+e\d+', 0, 'literal:expression', lambda x: (lambda y: int(y[0]) * 10 ** int(y[1]))(x.split('e'))),
 	RegexMatcher(r'\d*\.\d+j', 0, 'literal:expression', complex),
 	RegexMatcher(r'\d+j', 0, 'literal:expression', complex),
 	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),

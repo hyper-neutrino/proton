@@ -196,7 +196,8 @@ def keyword(name):
 	return ('keyword', 'keyword', name)
 
 matchers = [
-	PatternMatcher([('bracket', 'bracket', '('), (('binary_operator', 'binary_RTL'),), ('bracket', 'bracket', ')')], lambda x, y, z: x.addChild(y).addType('opfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent(''))
+	PatternMatcher([('bracket', 'bracket', '('), (('binary_operator', 'binary_RTL'),), ('bracket', 'bracket', ')')], lambda x, y, z: x.addChild(y).addType('opfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent('')),
+	PatternMatcher([('bracket', 'bracket', '('), ('unifix_operator',), ('bracket', 'bracket', ')')], lambda x, y, z: x.addChild(y).addType('unopfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent(''))
 ] + [
 	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
 ] + [
@@ -271,8 +272,8 @@ matchers = [
 	PatternMatcher([('unifix_operator', 'unifix_operator', '@'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
 	PatternMatcher([keyword('timeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword'))
 ] + [
-	PatternMatcher([keyword('return'), ('expression',)], lambda x, y: x.addChild(y).addType('return_statement').rmType('keyword')),
-	PatternMatcher([keyword('return')], lambda x: x.addChild(None).addType('return_statement').rmType('keyword'))
+	PatternMatcher([keyword('return'), ('expression',)], lambda x, y: x.addChild(y).addType('return_statement/expression').rmType('keyword')),
+	PatternMatcher([keyword('return')], lambda x: x.addChild(None).addType('return_statement/expression').rmType('keyword'))
 ]
 
 def parse(tokens):

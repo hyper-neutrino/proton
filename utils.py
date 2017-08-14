@@ -146,3 +146,14 @@ def h(x):
 			result += x[index]
 		index += 1
 	return result
+
+def make_type(dict):
+	class InnerType:
+		def __init__(self):
+			for key in dict:
+				value = dict[key]
+				if isinstance(value, Function):
+					self.__setattr__(key, lambda self, *a, **kwa: function(*a, **kwa))
+				else:
+					self.__setattr__(key, dict[key])
+	return InnerType()

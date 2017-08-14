@@ -1,4 +1,4 @@
-import parser, lexer, operator, math, sys, builtins, time
+import proton_parser, lexer, operator, math, sys, builtins, time
 
 from utils import *
 from copy import *
@@ -12,7 +12,7 @@ def setPath(newpath):
 def include(name):
 	filename = ((path) and (path + '/')) + name + '.proton'
 	with open(filename, 'r') as f:
-		return complete(parser.parse(lexer.tokenize(f.read())))[1]
+		return complete(proton_parser.parse(lexer.tokenize(f.read())))[1]
 
 def __include__(value, symlist, includer):
 	treetype = value.type.split('/')
@@ -140,13 +140,13 @@ def true_inverse(function):
 
 def english_convenienced_function(operand):
 	def inner(x, y, s):
-		if isinstance(x, parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'and':
+		if isinstance(x, proton_parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'and':
 			return inner(x.children[0], y, s) and inner(x.children[1], y, s)
-		elif isinstance(x, parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'or':
+		elif isinstance(x, proton_parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'or':
 			return inner(x.children[0], y, s) or inner(x.children[1], y, s)
-		elif isinstance(y, parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'and':
+		elif isinstance(y, proton_parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'and':
 			return inner(x, y.children[0], s) and inner(x, y.children[1], s)
-		elif isinstance(y, parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'or':
+		elif isinstance(y, proton_parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'or':
 			return inner(x, y.children[0], s) or inner(x, y.children[1], s)
 		else:
 			return operand(f(evaluate(x, s)), f(evaluate(y, s)))
@@ -154,6 +154,12 @@ def english_convenienced_function(operand):
 
 def EQ(x, y):
 	return f(x) == f(y)
+
+def instanceof(x, y):
+	if '__type__' in x:
+		return x['__type__']().function == y
+	else:
+		return isinstance(x, y)
 
 infix_operators = {
 	'**': _(operator.pow),
@@ -173,10 +179,10 @@ infix_operators = {
 	'!=': _(inverse(EQ)),
 	'in': english_convenienced_function(lambda x, y: x in y),
 	'not in': english_convenienced_function(lambda x, y: x not in y),
-	'is': english_convenienced_function(lambda x, y: isinstance(x, y.function)),
-	'is not': english_convenienced_function(inverse(lambda x, y: isinstance(x, y.function))),
-	'are': english_convenienced_function(lambda x, y: isinstance(x, y.function)),
-	'are not': english_convenienced_function(inverse(lambda x, y: isinstance(x, y.function))),
+	'is': english_convenienced_function(lambda x, y: instanceof(x, y.function)),
+	'is not': english_convenienced_function(inverse(lambda x, y: instanceof(x, y.function))),
+	'are': english_convenienced_function(lambda x, y: instanceof(x, y.function)),
+	'are not': english_convenienced_function(inverse(lambda x, y: instanceof(x, y.function))),
 	'&': _(operator.and_),
 	'|': _(operator.or_),
 	'^': _(operator.xor),
@@ -340,9 +346,11 @@ def proton_str(obj):
 	else:
 		return str(obj)
 
-default['eval'] = Function(lambda s, x: complete(parser.parse(lexer.tokenize(x)), s))
+default['eval'] = Function(lambda s, x: complete(proton_parser.parse(lexer.tokenize(x)), s))
 default['Function'] = Function
 default['str'] = proton_str
+default['type'] = lambda x: x['__type__'] if '__type__' in x else type(x)
+default['class'] = make_type
 
 def merge(d1, d2):
 	for x in d1:
@@ -393,9 +401,9 @@ def _evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = F
 	return value
 
 def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = False):
-	if not isinstance(tree, parser.ASTNode):
+	if not isinstance(tree, proton_parser.ASTNode):
 		return tree
-	setevalp(lambda k: complete(parser.parse(lexer.tokenize(k)), symlist = symlist or default)[0])
+	setevalp(lambda k: complete(proton_parser.parse(lexer.tokenize(k)), symlist = symlist or default)[0])
 	symlist = symlist or default
 	treetype = tree.type.split('/')
 	tokentype = tree.token.type.replace(':', '/').split('/')
@@ -409,9 +417,9 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		return Identifier(tree.token.content, getter, setter)
 	elif tree.token.content == 'unless':
 		if hardeval(tree.children[1], symlist, looped = looped, func = func):
-			_evaluate(tree.children[2], symlist, looped = looped, func = func)
+			return _evaluate(tree.children[2], symlist, looped = looped, func = func)
 		else:
-			_evaluate(tree.children[0], symlist, looped = looped, func = func)
+			return _evaluate(tree.children[0], symlist, looped = looped, func = func)
 	elif tree.token.content == 'if':
 		if hardeval(tree.children[0], symlist, looped = looped, func = func):
 			return _evaluate(tree.children[1], symlist, looped = looped, func = func)
@@ -421,53 +429,61 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		if 'whileas' in treetype:
 			sidelist = clone_scope(symlist)
 			value = hardeval(tree.children[0], sidelist, looped = looped, func = func)
+			result = None
 			while value:
 				assign(evaluate(tree.children[1], sidelist, looped = looped, func = func), value)
 				result = evaluate(tree.children[2], sidelist, looped = looped, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
-					if result.name == 'return': return result.value
+					if result.name == 'return': return result
 				value = hardeval(tree.children[0], sidelist, looped = looped, func = func)
 			del sidelist[evaluate(tree.children[1], looped = looped, func = func).name]
 			merge(sidelist, symlist)
+			return result
 		else:
+			result = None
 			while hardeval(tree.children[0], symlist, looped = looped, func = func):
 				result = _evaluate(tree.children[1], symlist, looped = looped, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
-					if result.name == 'return': return result.value
+					if result.name == 'return': return result
+			return result
 	elif tree.token.content == 'for':
 		if 'foreach' in treetype:
 			sidelist = clone_scope(symlist)
+			result = None
 			for val in hardeval(tree.children[1], sidelist, looped = looped, func = func):
 				assign(evaluate(tree.children[0], sidelist, looped = looped, func = func), val)
 				result = evaluate(tree.children[2], sidelist, looped = True, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
-					if result.name == 'return': return result.value
+					if result.name == 'return': return result
 			del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
 			merge(sidelist, symlist)
+			return result
 		else:
 			sidelist = clone_scope(symlist)
 			evaluate(tree.children[0], sidelist, looped = looped, func = func)
+			result = None
 			while not tree.children[1].children or hardeval(tree.children[1], sidelist, looped = looped, func = func):
 				result = evaluate(tree.children[-1], sidelist, looped = looped, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
-					if result.name == 'return': return result.value
+					if result.name == 'return': return result
 				if len(tree.children) >= 4: evaluate(tree.children[2], sidelist, looped = looped, func = func)
 			merge(sidelist, symlist)
+			return result
 	elif tree.token.content == 'try':
 		try:
-			_hardeval(tree.children[0], symlist, looped = looped, func = func)
+			return _hardeval(tree.children[0], symlist, looped = looped, func = func)
 		except Exception as e:
 			sidelist = clone_scope(symlist)
 			assign(evaluate(tree.children[1], sidelist), e, looped = looped, func = func)
-			evaluate(tree.children[2], sidelist, looped = looped, func = func)
+			return evaluate(tree.children[2], sidelist, looped = looped, func = func)
 	elif 'binary_operator' in tokentype or 'binary_RTL' in tokentype:
 		if tree.token.content in infix_operators:
 			return infix_operators[tree.token.content](tree.children[0], tree.children[1], symlist)
@@ -533,7 +549,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				result = evaluate(statement, sidelist, looped = looped, func = True)
 				if isinstance(result, Statement):
 					merge(sidelist, symlist)
-					if result.name == 'return': return result.value
+					if result.name == 'return': return result
 					return result
 			merge(sidelist, symlist)
 			return result
@@ -576,6 +592,9 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			assign_method_parameters(values, tree.children[0], scope)
 			value = f(hardeval(tree.children[1], scope, func = True))
 			merge(scope, symlist)
+			if isinstance(value, Statement):
+				if value.name == 'return': return value.value
+				raise SystemExit('huh?')
 			return value
 		return Function(inner)
 	elif 'expression' in treetype:
@@ -595,4 +614,4 @@ def complete(tree, symlist = None):
 	return Interpreter(tree).interpret(symlist)
 
 def full(code, symlist = None):
-	return complete(parser.parse(lexer.tokenize(code)), symlist = symlist)
+	return complete(proton_parser.parse(lexer.tokenize(code)), symlist = symlist)
