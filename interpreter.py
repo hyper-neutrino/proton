@@ -482,7 +482,10 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			array = f(evaluate(tree.children[0], symlist, looped = looped, func = func))
 			index_list = indices(array, tree.children[1], symlist)
 			def getter():
-				return type(array)(array[index] for index in index_list)
+				if type(array) == str:
+					return ''.join(array[index] for index in index_list)
+				else:
+					return type(array)(array[index] for index in index_list)
 			def setter(*args):
 				args = args[0]
 				for index in range(min(len(index_list), len(args))):

@@ -142,7 +142,7 @@ matchers = [
 	RegexMatcher(r'\d+j', 0, 'literal:expression', complex),
 	RegexMatcher(r'\d+\s*/\s*\d+', 0, 'literal:expression', sympy.Rational),
 	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),
-	RegexMatcher(r'\d+', 0, 'literal:expression', int),
+	RegexMatcher(r'\d+', 0, 'literal:expression', sympy.Integer),
 	RegexMatcher(r'"([^"\\]|\\.)*"', 0, 'literal:expression', lambda x: ast.literal_eval('""%s""' % x)),
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: ast.literal_eval("''%s''" % x)),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
