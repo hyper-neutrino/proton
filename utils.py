@@ -148,12 +148,18 @@ def h(x):
 	return result
 
 def make_type(dict):
+	funcs = {}
+	other = {}
+	for key in dict:
+		value = dict[key]
+		if isinstance(value, Function):
+			funcs[key] = value
+		else:
+			other[key] = value
 	class InnerType:
 		def __init__(self):
-			for key in dict:
-				value = dict[key]
-				if isinstance(value, Function):
-					self.__setattr__(key, lambda self, *a, **kwa: function(*a, **kwa))
-				else:
-					self.__setattr__(key, dict[key])
+			for key in other:
+				self.__setattr__(key, other[key])
+	for key in funcs:
+		setattr(InnerType, key, dict[key])
 	return InnerType()
