@@ -109,7 +109,7 @@ binary_operators = [
 	('.',),
 	('**',),
 	('>>', '<<'),
-	('*', '/', '//'),
+	('*', '/', '//', '||'),
 	('%',),
 	('+', '-'),
 	('>', '<', '<=', '>='),
@@ -118,13 +118,13 @@ binary_operators = [
 	('^',),
 	('**=', '*=', '/=', '//=', '+=', '-=', '>>=', '<<=', '%=', '&=', '|=', '&&=', '||='),
 	('==', '!=', ':=', '=', '=:'),
-	('&&', 'and'),
-	('||', 'or'),
+	('and', 'nand'),
+	('or', 'nor'),
 	('in', 'not in', 'is', 'are', 'is not', 'are not', 'inside', 'not inside'),
 ]
 
-prefix_operators = ['!', '++', '--', '~', '@', '$', '$$']
-postfix_operators = ['!', '++', '--']
+prefix_operators = ['!', '++', '--', '~', '@', '$', '$$', '!!']
+postfix_operators = ['!', '++', '--', '??']
 
 unifix_operators = prefix_operators + postfix_operators
 
@@ -135,7 +135,7 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof', 'return']
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof', 'sizeof', 'del', 'return', 'repeat']
 
 ignore = ('not',)
 
@@ -166,10 +166,10 @@ def intify(base):
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
-	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/"(([^/\\]|\\.)*)"/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
-	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/"(([^/\\]|\\.)*)"/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
-	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r"/'(([^/\\]|\\.)*)'/([ailmsx]*)", code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
-	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r"/'(([^/\\]|\\.)*)'/", code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
+	RegexMatcher('(%s)' % '|'.join('\(\s*%s\s*\)' % re.escape(operator) for operator in sum(binary_operators, ())), 1, 'binopfunc/expression', lambda x: (lambda y: y[1:] and y[1] or y[0][1])(re.split('\s+', x))),
+	RegexMatcher('(%s)' % '|'.join('\(\s*%s\s*\)' % re.escape(operator) for operator in          unifix_operators), 1,  'unopfunc/expression', lambda x: (lambda y: y[1:] and y[1] or y[0][1])(re.split('\s+', x))),
+	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
 	RegexMatcher(r'\d+b[01]+', 0, 'literal:expression', intify(2)),
 	RegexMatcher(r'\d+o[0-7]+', 0, 'literal:expression', intify(8)),
 	RegexMatcher(r'\d+x[0-9a-fA-F]+', 0, 'literal:expression', intify(16)),
@@ -186,7 +186,7 @@ matchers = [
 	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators + ignore else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
 	RegexMatcher(r';', 0, 'semicolon'),
 	RegexMatcher(r',', 0, 'comma'),
-	RegexMatcher(r'\?', 0, 'ternary'),
+	RegexMatcher(r'(\?)[^?]', 0, 'ternary'),
 	RegexMatcher(r':>', 0, 'maparrow'),
 	RegexMatcher(r'->', 0, 'arrow'),
 	RegexMatcher(r'=>', 0, 'lambda'),

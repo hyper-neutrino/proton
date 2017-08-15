@@ -1,4 +1,10 @@
-ordinal = num => {
+import default
+
+import time
+
+sleep = time.sleep
+
+!!ordinal = num => {
 	string = str(num)
 	num %= 100
 	if num % 10 == 1 and num != 11 string += 'st'
@@ -8,9 +14,36 @@ ordinal = num => {
 	return string
 }
 
-map = function, list => {
+!!map = function, list => {
 	result = []
 	for value : list result.append(function(value))
+	return type(list)(result)
+}
+
+!!filter = function, list => {
+	result = []
+	for value : list if function(value) result.append(value)
+	return type(list)(result)
+}
+
+!!reduce = function, array => {
+	list = list(array)
+	if !list return 0
+	while (len(list) > 1) {
+		list[0, 1] = [function(list[0], list[1])]
+	}
+	return list[0]
+}
+
+!!digits = base, number => {
+	result = []
+	trunc = number % 1
+	number = int(number)
+	while number {
+		result.insert(0, number % base)
+		number //= base
+	}
+	if result result[-1] += trunc
 	return result
 }
 

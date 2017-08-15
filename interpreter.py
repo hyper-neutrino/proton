@@ -57,20 +57,41 @@ def _import(value, symlist):
 def clone_scope(scope):
 	return {x: scope[x] for x in scope}
 
+def delete(item, symlist):
+	if isinstance(item, (list, tuple, set)):
+		for i in item:
+			delete(i, symlist)
+	elif isinstance(item, Identifier):
+		del symlist[item.name]
+	else:
+		raise SyntaxError('del can only be used on identifiers or lists of identifiers')
+
 def assign_method_parameters(parameters, expression, scope):
 	if 'comma_expr' in expression.type.split('/'):
 		pairs = []
 		varargs = False
 		paramindex = 0
+		required = [1 if child.token.type == 'unifix_operator' and child.token.content == '*' else 2 if child.type == 'nullable/expression' else 0 for child in expression.children]
+		extra = len(parameters) - required.count(0)
+		for i in range(len(required)):
+			if required[i] == 2 and extra > 0:
+				required[i] = 0
+				extra -= 1
+		if extra and not required.count(1):
+			raise RuntimeError('Too many arguments given')
 		for index in range(len(expression.children)):
+			if required[index] == 2: continue
+			if paramindex >= len(parameters):
+				raise IndexError('Not enough arguments given')
 			subexpr = expression.children[index]
-			if subexpr.token.type == 'unifix_operator' and subexpr.token.content == '...':
+			if subexpr.token.type == 'unifix_operator' and subexpr.token.content == '*':
 				if varargs:
 					raise RuntimeError('There can only be one varargs expression in a function declaration')
 				else:
 					varargs = True
-					scope[evaluate(subexpr.children[0], scope).name] = tuple(parameters[paramindex:len(parameters) - index])
-					paramindex = len(parameters) - index
+					end = len(parameters) - len(expression.children) + index + 1
+					scope[evaluate(subexpr.children[0], scope).name] = tuple(parameters[paramindex:end])
+					paramindex = end
 			else:
 				scope[evaluate(subexpr).name] = parameters[paramindex]
 				paramindex += 1
@@ -80,6 +101,13 @@ def assign_method_parameters(parameters, expression, scope):
 	else:
 		if expression.token.type == 'unifix_operator' and expression.token.content == '*':
 			scope[evaluate(expression.children[0]).name] = tuple(parameters)
+		elif expression.token.type == 'nullable/expression':
+			name = evaluate(expression.children[0].name)
+			if parameters:
+				scope[name] = parameters[0]
+			else:
+				scope[name] = 0
+				del scope[name]
 		else:
 			scope[evaluate(expression).name] = parameters[0]
 
@@ -143,13 +171,21 @@ def true_inverse(function):
 def english_convenienced_function(operand):
 	def inner(x, y, s):
 		if isinstance(x, proton_parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'and':
-			return inner(x.children[0], y, s) and inner(x.children[1], y, s)
+			return     (inner(x.children[0], y, s) and inner(x.children[1], y, s))
 		elif isinstance(x, proton_parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'or':
-			return inner(x.children[0], y, s) or inner(x.children[1], y, s)
+			return     (inner(x.children[0], y, s) or inner(x.children[1], y, s))
+		elif isinstance(x, proton_parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'nand':
+			return not (inner(x.children[0], y, s) and inner(x.children[1], y, s))
+		elif isinstance(x, proton_parser.ASTNode) and x.token.type == 'binary_operator' and x.token.content == 'nor':
+			return not (inner(x.children[0], y, s) or inner(x.children[1], y, s))
 		elif isinstance(y, proton_parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'and':
-			return inner(x, y.children[0], s) and inner(x, y.children[1], s)
+			return     (inner(x, y.children[0], s) and inner(x, y.children[1], s))
 		elif isinstance(y, proton_parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'or':
-			return inner(x, y.children[0], s) or inner(x, y.children[1], s)
+			return     (inner(x, y.children[0], s) or inner(x, y.children[1], s))
+		elif isinstance(y, proton_parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'nand':
+			return not (inner(x, y.children[0], s) and inner(x, y.children[1], s))
+		elif isinstance(y, proton_parser.ASTNode) and y.token.type == 'binary_operator' and y.token.content == 'nor':
+			return not (inner(x, y.children[0], s) or inner(x, y.children[1], s))
 		else:
 			return operand(f(evaluate(x, s)), f(evaluate(y, s)))
 	return inner
@@ -178,6 +214,7 @@ infix_operators = {
 	'*': _(operator.mul),
 	'/': _(operator.truediv),
 	'//': _(operator.floordiv),
+	'||': _(lambda x, y: y % x == 0),
 	'%': _(operator.mod),
 	'+': _(operator.add),
 	'-': _(operator.sub),
@@ -198,8 +235,10 @@ infix_operators = {
 	'&': _(operator.and_, False, False),
 	'|': _(operator.or_),
 	'^': _(operator.xor),
-	'and' : lambda x, y, z: (lambda k: k if not k else f(evaluate(y, z)))(f(evaluate(x, z))),
-	'or'  : lambda x, y, z: (lambda k: k   if   k else f(evaluate(y, z)))(f(evaluate(x, z))),
+	'and'  : lambda x, y, z: (lambda k: k if not k else f(evaluate(y, z)))(f(evaluate(x, z))),
+	'or'   : lambda x, y, z: (lambda k: k   if   k else f(evaluate(y, z)))(f(evaluate(x, z))),
+	'nand' : lambda x, y, z: (lambda k: f(evaluate(y, z))   if   k else k)(f(evaluate(x, z))),
+	'nor'  : lambda x, y, z: (lambda k: f(evaluate(y, z)) if not k else k)(f(evaluate(x, z))),
 	'**=': __(operator.pow),
 	'*=': __(operator.mul),
 	'/=': __(operator.truediv),
@@ -222,10 +261,14 @@ def ___(op):
 	return lambda x, z: op(f(evaluate(x, z)))
 
 def exists(value, symlist):
-	if value.token.type == 'binary_operator' and value.token.content in ['and', '&&']:
-		return exists(value.children[0], symlist) and exists(value.children[1], symlist)
-	elif value.token.type == 'binary_operator' and value.token.content in ['or', '||']:
-		return exists(value.children[0], symlist) or exists(value.children[1], symlist)
+	if value.token.type == 'binary_operator' and value.token.content == 'and':
+		return     (exists(value.children[0], symlist) and exists(value.children[1], symlist))
+	elif value.token.type == 'binary_operator' and value.token.content == 'or':
+		return     (exists(value.children[0], symlist)  or exists(value.children[1], symlist))
+	if value.token.type == 'binary_operator' and value.token.content == 'nand':
+		return not (exists(value.children[0], symlist) and exists(value.children[1], symlist))
+	elif value.token.type == 'binary_operator' and value.token.content == 'nor':
+		return not (exists(value.children[0], symlist)  or exists(value.children[1], symlist))
 	elif 'bracket' in value.type and 'bracket_expr' in value.type:
 		return exists(value.children[0], symlist)
 	else:
@@ -303,7 +346,7 @@ def autosplat(function):
 			else:
 				result += [arg]
 		return function(*result)
-	return Function(inner)
+	return getfunction(inner)
 
 prefix_operators = {
 	'!': ___(operator.not_),
@@ -312,9 +355,12 @@ prefix_operators = {
 	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z)),
 	'-': ___(negative),
 	'@': ___(lambda x: x.setCaching(True)),
+	'!!': ___(lambda x: x.setPartial(True)),
+	'&': ___(lambda x: getfunction(lambda *a, **k: call(x, a, **k))),
 	'$': ___(lambda x: x.wipeCache()),
 	'$$': ___(lambda x: x.setCaching(False).wipeCache()),
 	'timeof': lambda x, s: elapsed(lambda: evaluate(x, s)),
+	'sizeof': ___(sys.getsizeof),
 	'*': ___(autosplat),
 }
 
@@ -356,7 +402,7 @@ for name in dir(builtins):
 	try:
 		default[name] = eval(name)
 		if isinstance(default[name], (type(print), type(lambda:0), type(type))):
-			default[name] = Function(default[name])
+			default[name] = getfunction(default[name])
 	except:
 		pass
 
@@ -368,7 +414,7 @@ def proton_str(obj):
 	else:
 		return str(obj)
 
-default['eval'] = Function(lambda s, x: complete(proton_parser.parse(lexer.tokenize(x)), s))
+default['eval'] = getfunction(lambda s, x: complete(proton_parser.parse(lexer.tokenize(x)), s))
 default['Function'] = Function
 default['str'] = proton_str
 default['type'] = lambda x: x['__type__'] if '__type__' in x else type(x)
@@ -472,6 +518,34 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 					if result.name == 'continue': continue
 					if result.name == 'return': return result
 			return result
+	elif tree.token.content == 'repeat':
+		if 'repeatinto' in treetype:
+			sidelist = clone_scope(symlist)
+			value = f(hardeval(tree.children[0], sidelist, looped = looped, func = func))
+			index = 0
+			result = None
+			while index < value:
+				assign(evaluate(tree.children[1], sidelist, looped = looped, func = func), index)
+				result = evaluate(tree.children[2], sidelist, looped = looped, func = func)
+				if isinstance(result, Statement):
+					if result.name == 'break': break
+					if result.name == 'continue': continue
+					if result.name == 'return': return result
+				index += 1
+			del sidelist[evaluate(tree.children[1], looped = looped, func = func).name]
+			merge(sidelist, symlist)
+			return result
+		else:
+			result = None
+			value = f(hardeval(tree.children[0], symlist, looped = looped, func = func))
+			while value:
+				result = _evaluate(tree.children[1], symlist, looped = looped, func = func)
+				if isinstance(result, Statement):
+					if result.name == 'break': break
+					if result.name == 'continue': continue
+					if result.name == 'return': return result
+				value -= 1
+			return result
 	elif tree.token.content == 'for':
 		if 'foreach' in treetype:
 			sidelist = clone_scope(symlist)
@@ -554,17 +628,23 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				result = comma_mode([array])
 			return result
 		if all(isinstance(element, Function) for element in flatten(result)):
-			return Function(lambda *args, **kwargs: call(result, *args, **kwargs))
+			return getfunction(lambda *args, **kwargs: call(result, *args, **kwargs))
 		return result
 	elif 'mapping' in treetype:
 		return MapExpr(*[evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
+	elif 'binopfunc' in treetype:
+		def inner(*args, **kwargs):
+			arguments = args[:2] + (symlist,)
+			value = infix_operators[tree.token.content](*arguments)
+			return args[2:] and (value,) + args[2:] or value
+		return getfunction(inner, False)
+	elif 'unopfunc' in treetype:
+		def inner(*args, **kwargs):
+			arguments = args[:2] + (symlist,)
+			value = prefix_operators[tree.token.content](*arguments)
+			return args[1:] and (value,) + args[1:] or value
+		return getfunction(inner, False)
 	elif 'bracket_expr' in treetype:
-		if 'opfunc' in treetype:
-			def inner(*args, **kwargs):
-				arguments = args[:2] + (symlist,)
-				value = infix_operators[tree.children[0].token.content](*arguments)
-				return args[2:] and (value,) + args[2:] or value
-			return Function(inner, False)
 		if 'bracket' in treetype:
 				return evaluate(tree.children[0], symlist, tuple, looped = looped, func = func)
 		elif 'list' in treetype:
@@ -626,14 +706,24 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 	elif 'anonfunc' in treetype:
 		def inner(*values):
 			scope = clone_scope(symlist)
-			assign_method_parameters(values, tree.children[0], scope)
-			value = f(hardeval(tree.children[1], scope, func = True))
-			merge(scope, symlist)
-			if isinstance(value, Statement):
-				if value.name == 'return': return value.value
-				raise SystemExit('huh?')
-			return value
-		return Function(inner)
+			try:
+				assign_method_parameters(values, tree.children[0], scope)
+				value = f(hardeval(tree.children[1], scope, func = True))
+				merge(scope, symlist)
+				if isinstance(value, Statement):
+					if value.name == 'return': return value.value
+					raise SystemExit('huh?')
+				return value
+			except IndexError:
+				if getfunction(inner).partial:
+					def _inner(*args):
+						return inner(*(values + args))
+					return _inner
+				else:
+					raise
+		return getfunction(inner)
+	elif 'del' in treetype:
+		delete(evaluate(tree.children[0]), symlist)
 	elif 'expression' in treetype:
 		return evaluate(tree.children[0], symlist, looped = looped, func = func)
 

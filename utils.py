@@ -55,12 +55,25 @@ def call(func, *args, **kwargs):
 		return type(func)(call(f, *args, **kwargs) for f in func)
 	return func(*args, **kwargs)
 
+funcskey = []
+funcsval = []
+
+def getfunction(function, cast = True, cache = False, partial = False):
+	try:
+		return funcsval[funcskey.index(function)]
+	except:
+		func = Function(function, cast, cache, partial)
+		funcskey.append(function)
+		funcsval.append(func)
+		return func
+
 class Function:
-	def __init__(self, function, cast = True, cache = False):
+	def __init__(self, function, cast = True, cache = False, partial = False):
 		global id
 		self.function = function
 		self.cast = cast
-		self.cache = False
+		self.cache = cache
+		self.partial = partial
 		self.id = id
 		id += 1
 		if not haskey(self.function):
@@ -69,9 +82,9 @@ class Function:
 			fval.append(self.function)
 			vals.append([])
 	def __rshift__(self, other):
-		return Function(lambda *args, **kwargs: call(other, *((call(self.function, *args, **kwargs),) + args[1:]), **kwargs))
+		return Function(lambda *args, **kwargs: call(other, *((call(self.function, *args, **kwargs),) + args), **kwargs))
 	def __lshift__(self, other):
-		return Function(lambda *args, **kwargs: call(self.function, *(args[:-1] + (call(other, *args, **kwargs),)), **kwargs))
+		return Function(lambda *args, **kwargs: call(self.function, *(args + (call(other, *args, **kwargs),)), **kwargs))
 	def __and__(self, other):
 		return Function(lambda *args, **kwargs: self.function(*(args + (other,)), **kwargs), self.cast, self.cache and other.cache)
 	def __rand__(self, other):
@@ -99,6 +112,8 @@ class Function:
 		keys[fkey.index(self.function)] = []
 		vals[fkey.index(self.function)] = []
 		return self
+	def setPartial(self, partial):
+		self.partial = partial
 
 IDENT = None
 EVALP = None
@@ -123,7 +138,6 @@ def f(x):
 	elif hasattr(x, '__iter__') and not isinstance(x, str):
 		try:
 			return type(x)(map(f, x))
-			return x
 		except:
 			return g(x)
 	elif isinstance(x, str):
