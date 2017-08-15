@@ -200,7 +200,7 @@ def instanceof(x, y):
 		return isinstance(x, y)
 
 def deep_search(x, y):
-	if x in y or x == y: return True
+	if x == y or x in y: return True
 	if hasattr(y, '__iter__'):
 		for Y in y:
 			if deep_search(x, Y):
