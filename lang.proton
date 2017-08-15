@@ -17,8 +17,7 @@ sleep = time.sleep
 !!map = function, list => {
 	result = []
 	for value : list result.append(function(value))
-	if list is str return result
-	return type(list)(result)
+	return result
 }
 
 !!filter = function, list => {

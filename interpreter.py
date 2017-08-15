@@ -77,7 +77,7 @@ def assign_method_parameters(parameters, expression, scope):
 			if required[i] == 2 and extra > 0:
 				required[i] = 0
 				extra -= 1
-		if extra and not required.count(1):
+		if extra > 0 and not required.count(1):
 			raise RuntimeError('Too many arguments given')
 		for index in range(len(expression.children)):
 			if required[index] == 2: continue
@@ -197,7 +197,11 @@ def instanceof(x, y):
 	if isinstance(x, dict) and '__type__' in x:
 		return x['__type__']().function == y
 	else:
-		return isinstance(x, y)
+		if type(x) == y:
+			return True
+		if type(y) == type:
+			return isinstance(x, y)
+		return False
 
 def deep_search(x, y):
 	if x == y or hasattr(y, '__iter__') and x in y: return True
@@ -224,6 +228,7 @@ infix_operators = {
 	'>=': _(operator.ge),
 	'==': _(EQ),
 	'!=': _(inverse(EQ)),
+	'..': _(lambda x, y: list(range(x, y))),
 	'in': english_convenienced_function(lambda x, y: x in y),
 	'not in': english_convenienced_function(lambda x, y: x not in y),
 	'inside': english_convenienced_function(deep_search),
@@ -406,13 +411,14 @@ for name in dir(builtins):
 	except:
 		pass
 
-def proton_str(obj):
-	if isinstance(obj, dict):
-		return '[%s]' % ', '.join(sorted([ascii(key) + ' :> ' + ascii(obj[key]) for key in obj]))
-	elif isinstance(obj, Function):
-		return proton_str(obj.function)
-	else:
-		return str(obj)
+class proton_str(str):
+	def __init__(self, obj):
+		if isinstance(obj, dict):
+			self = '[%s]' % ', '.join(sorted([ascii(key) + ' :> ' + ascii(obj[key]) for key in obj]))
+		elif isinstance(obj, Function):
+			self = proton_str(obj.function)
+		else:
+			self = str(obj)
 
 default['eval'] = getfunction(lambda s, x: complete(proton_parser.parse(lexer.tokenize(x)), s))
 default['Function'] = Function
