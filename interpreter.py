@@ -194,7 +194,7 @@ def EQ(x, y):
 	return f(x) == f(y)
 
 def instanceof(x, y):
-	if '__type__' in x:
+	if isinstance(x, dict) and '__type__' in x:
 		return x['__type__']().function == y
 	else:
 		return isinstance(x, y)
@@ -417,7 +417,7 @@ def proton_str(obj):
 default['eval'] = getfunction(lambda s, x: complete(proton_parser.parse(lexer.tokenize(x)), s))
 default['Function'] = Function
 default['str'] = proton_str
-default['type'] = lambda x: x['__type__'] if '__type__' in x else type(x)
+default['type'] = lambda x: x['__type__'] if isinstance(x, dict) and '__type__' in x else type(x)
 default['class'] = make_type
 
 def merge(d1, d2):

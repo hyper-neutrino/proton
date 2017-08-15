@@ -166,8 +166,8 @@ def intify(base):
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
-	RegexMatcher('(%s)' % '|'.join('\(\s*%s\s*\)' % re.escape(operator) for operator in sum(binary_operators, ())), 1, 'binopfunc/expression', lambda x: (lambda y: y[1:] and y[1] or y[0][1])(re.split('\s+', x))),
-	RegexMatcher('(%s)' % '|'.join('\(\s*%s\s*\)' % re.escape(operator) for operator in          unifix_operators), 1,  'unopfunc/expression', lambda x: (lambda y: y[1:] and y[1] or y[0][1])(re.split('\s+', x))),
+	RegexMatcher('(%s)' % '|'.join('\\(\\s*%s\\s*\\)' % re.escape(operator) for operator in sum(binary_operators, ())), 1, 'binopfunc/expression', lambda x: x[1:-1].strip()),
+	RegexMatcher('(%s)' % '|'.join('\\(\\s*%s\\s*\\)' % re.escape(operator) for operator in          unifix_operators), 1,  'unopfunc/expression', lambda x: x[1:-1].strip()),
 	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
 	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
 	RegexMatcher(r'\d+b[01]+', 0, 'literal:expression', intify(2)),

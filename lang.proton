@@ -56,5 +56,6 @@ print = *arguments => {
 select = *indices => array => {
 	result = []
 	for index : indices result.append(array[index])
+	if len(indices) == 1 return result[0]
 	return type(array)(result)
 }
