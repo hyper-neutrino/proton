@@ -140,12 +140,11 @@ def f(x):
 			return type(x)(map(f, x))
 		except:
 			return g(x)
-	elif isinstance(x, str):
-		return h(x)
 	else:
 		return g(x)
 
 def h(x):
+	if not isinstance(x, str): return x
 	result = ''
 	index = 0
 	while index < len(x):

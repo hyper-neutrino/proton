@@ -482,7 +482,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 	treetype = tree.type.split('/')
 	tokentype = tree.token.type.replace(':', '/').split('/')
 	if 'literal' in tokentype:
-		return tree.token.content
+		return h(tree.token.content)
 	elif 'identifier' in tokentype:
 		def getter():
 			return None if tree.token.content not in symlist else symlist[tree.token.content]
