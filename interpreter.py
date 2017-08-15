@@ -619,7 +619,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		else:
 			raise SyntaxError('return outside of function')
 	elif 'comma_expr' in treetype:
-		result = comma_mode([evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
+		result = comma_mode(f(evaluate(child, symlist, looped = looped, func = func)) for child in tree.children)
 		def flatten(array):
 			result = comma_mode()
 			if isinstance(array, (list, tuple, set)):
@@ -627,8 +627,8 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			else:
 				result = comma_mode([array])
 			return result
-		if all(isinstance(element, Function) for element in flatten(result)):
-			return getfunction(lambda *args, **kwargs: call(result, *args, **kwargs))
+		if all(isinstance(f(element), Function) for element in flatten(result)):
+			return getfunction(lambda *args, **kwargs: call(f(result), *args, **kwargs))
 		return result
 	elif 'mapping' in treetype:
 		return MapExpr(*[evaluate(child, symlist, looped = looped, func = func) for child in tree.children])

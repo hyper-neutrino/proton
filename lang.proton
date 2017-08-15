@@ -17,6 +17,7 @@ sleep = time.sleep
 !!map = function, list => {
 	result = []
 	for value : list result.append(function(value))
+	if list is str return result
 	return type(list)(result)
 }
 
@@ -58,4 +59,31 @@ select = *indices => array => {
 	for index : indices result.append(array[index])
 	if len(indices) == 1 return result[0]
 	return type(array)(result)
+}
+
+!!cartesianproduct = left, right => {
+	result = []
+	for l : left for r : right result.append((l, r))
+	return result
+}
+
+!!cartesianpower = power, array => {
+	if power == 0 return []
+	if power == 1 return array
+	if power == 2 return cartesianproduct(array, array)
+	result = []
+	for a : array for k : cartesianpower(power - 1, array) {result.append((a,) + k)}
+	return result
+}
+
+!!prefixes = array => {
+	result = []
+	for i : range(len(array)) result.append(array[to i + 1])
+	return result
+}
+
+!!suffixes = array => {
+	result = []
+	for i : range(len(array)) result.append(array[i to])
+	return result
 }
