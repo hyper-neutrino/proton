@@ -196,8 +196,8 @@ def keyword(name):
 	return ('keyword', 'keyword', name)
 
 matchers = [
-	PatternMatcher([('bracket', 'bracket', '('), (('binary_operator', 'binary_RTL'),), ('bracket', 'bracket', ')')], lambda x, y, z: x.addChild(y).addType('opfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent('')),
-	PatternMatcher([('bracket', 'bracket', '('), ('unifix_operator',), ('bracket', 'bracket', ')')], lambda x, y, z: x.addChild(y).addType('unopfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent(''))
+	PatternMatcher([('bracket', 'bracket', '{'), (('binary_operator', 'binary_RTL'),), ('bracket', 'bracket', '}')], lambda x, y, z: x.addChild(y).addType('opfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent('')),
+	PatternMatcher([('bracket', 'bracket', '{'), ('unifix_operator',), ('bracket', 'bracket', '}')], lambda x, y, z: x.addChild(y).addType('unopfunc/expression/bracket_expr').rmType('bracket').setTokenType('').setTokenContent(''))
 ] + [
 	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
 ] + [

@@ -166,8 +166,10 @@ def intify(base):
 matchers = [
 	RegexMatcher(r'#.+', -1, 'comment'),
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
-	LexerMatcher(lambda code, last: None if last and 'operator' in last.type else re.match(r'/(([^/\\]|\\.)*)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
-	LexerMatcher(lambda code, last: None if last and 'operator' in last.type else re.match(r'/(([^/\\]|\\.)*)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/"(([^/\\]|\\.)*)"/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/"(([^/\\]|\\.)*)"/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r"/'(([^/\\]|\\.)*)'/([ailmsx]*)", code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r"/'(([^/\\]|\\.)*)'/", code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
 	RegexMatcher(r'\d+b[01]+', 0, 'literal:expression', intify(2)),
 	RegexMatcher(r'\d+o[0-7]+', 0, 'literal:expression', intify(8)),
 	RegexMatcher(r'\d+x[0-9a-fA-F]+', 0, 'literal:expression', intify(16)),
