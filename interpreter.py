@@ -563,7 +563,9 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 					if result.name == 'break': break
 					if result.name == 'continue': continue
 					if result.name == 'return': return result
-			del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
+			try:
+				del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
+			except: pass
 			merge(sidelist, symlist)
 			return result
 		else:

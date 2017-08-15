@@ -47,6 +47,11 @@ sleep = time.sleep
 	return result
 }
 
+fallthrough = value => {
+	print(value)
+	return value
+}
+
 pyprint = print
 
 print = *arguments => {
