@@ -50,6 +50,11 @@ def getkey(function):
 def haskey(function):
 	return any(key == function for key in fkey)
 
+def call(func, *args, **kwargs):
+	if isinstance(func, (list, tuple, set)):
+		return type(func)(call(f, *args, **kwargs) for f in func)
+	return func(*args, **kwargs)
+
 class Function:
 	def __init__(self, function, cast = True, cache = False):
 		global id
@@ -63,6 +68,10 @@ class Function:
 			keys.append([])
 			fval.append(self.function)
 			vals.append([])
+	def __rshift__(self, other):
+		return Function(lambda *args, **kwargs: call(other, *((call(self.function, *args, **kwargs),) + args[1:]), **kwargs))
+	def __lshift__(self, other):
+		return Function(lambda *args, **kwargs: call(self.function, *(args[:-1] + (call(other, *args, **kwargs),)), **kwargs))
 	def __and__(self, other):
 		return Function(lambda *args, **kwargs: self.function(*(args + (other,)), **kwargs), self.cast, self.cache and other.cache)
 	def __rand__(self, other):
@@ -72,6 +81,7 @@ class Function:
 		if self.cache and (args, kwargs) in getkey(self.function):
 			return getval(self.function, getkey(self.function).index((args, kwargs)))
 		else:
+			if isinstance(args, map): args = list(args)
 			result = self.function(*args, **kwargs)
 			if self.cache:
 				getkey(self.function).append((args, kwargs))

@@ -19,3 +19,9 @@ pyprint = print
 print = *arguments => {
 	pyprint(*map(str, arguments))
 }
+
+select = *indices => array => {
+	result = []
+	for index : indices result.append(array[index])
+	return type(array)(result)
+}

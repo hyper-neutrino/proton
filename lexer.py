@@ -120,7 +120,7 @@ binary_operators = [
 	('==', '!=', ':=', '=', '=:'),
 	('&&', 'and'),
 	('||', 'or'),
-	('in', 'not in', 'is', 'are', 'is not', 'are not'),
+	('in', 'not in', 'is', 'are', 'is not', 'are not', 'inside', 'not inside'),
 ]
 
 prefix_operators = ['!', '++', '--', '~', '@', '$', '$$']

@@ -88,8 +88,10 @@ def _s(op):
 		return safechain([lambda: op(x, y), lambda: op(x, f(y)), lambda: op(f(x), y), lambda: op(f(x), f(y))])
 	return inner
 
-def _(op):
-	return lambda x, y, z: _s(op)(f(evaluate(x, z)), f(evaluate(y, z)))
+def _(op, l = True, r = True):
+	L = f if l else lambda k: k
+	R = f if r else lambda k: k
+	return lambda x, y, z: _s(op)(L(evaluate(x, z)), R(evaluate(y, z)))
 
 def __(op):
 	return lambda x, y, z: (lambda k, j: k(_s(op)(k, j)))(evaluate(x, z), f(evaluate(y, z)))
@@ -161,6 +163,14 @@ def instanceof(x, y):
 	else:
 		return isinstance(x, y)
 
+def deep_search(x, y):
+	if x in y or x == y: return True
+	if hasattr(y, '__iter__'):
+		for Y in y:
+			if deep_search(x, Y):
+				return True
+	return False
+
 infix_operators = {
 	'**': _(operator.pow),
 	'>>': _(operator.rshift),
@@ -179,16 +189,16 @@ infix_operators = {
 	'!=': _(inverse(EQ)),
 	'in': english_convenienced_function(lambda x, y: x in y),
 	'not in': english_convenienced_function(lambda x, y: x not in y),
+	'inside': english_convenienced_function(deep_search),
+	'not inside': english_convenienced_function(inverse(deep_search)),
 	'is': english_convenienced_function(lambda x, y: instanceof(x, y.function)),
 	'is not': english_convenienced_function(inverse(lambda x, y: instanceof(x, y.function))),
 	'are': english_convenienced_function(lambda x, y: instanceof(x, y.function)),
 	'are not': english_convenienced_function(inverse(lambda x, y: instanceof(x, y.function))),
-	'&': _(operator.and_),
+	'&': _(operator.and_, False, False),
 	'|': _(operator.or_),
 	'^': _(operator.xor),
-	'&&'  : lambda x, y, z: (lambda k: k if not k else f(evaluate(y, z)))(f(evaluate(x, z))),
 	'and' : lambda x, y, z: (lambda k: k if not k else f(evaluate(y, z)))(f(evaluate(x, z))),
-	'||'  : lambda x, y, z: (lambda k: k   if   k else f(evaluate(y, z)))(f(evaluate(x, z))),
 	'or'  : lambda x, y, z: (lambda k: k   if   k else f(evaluate(y, z)))(f(evaluate(x, z))),
 	'**=': __(operator.pow),
 	'*=': __(operator.mul),
@@ -284,6 +294,17 @@ def set_indices(reference, array, indices, values):
 		else:
 			return reference(type(array)(filter(DEL().__ne__, array)))
 
+def autosplat(function):
+	def inner(*args, **kwargs):
+		result = []
+		for arg in args:
+			if isinstance(arg, (list, tuple, set)):
+				result += list(arg)
+			else:
+				result += [arg]
+		return function(*result)
+	return Function(inner)
+
 prefix_operators = {
 	'!': ___(operator.not_),
 	'~': ___(operator.invert),
@@ -294,6 +315,7 @@ prefix_operators = {
 	'$': ___(lambda x: x.wipeCache()),
 	'$$': ___(lambda x: x.setCaching(False).wipeCache()),
 	'timeof': lambda x, s: elapsed(lambda: evaluate(x, s)),
+	'*': ___(autosplat),
 }
 
 postfix_operators = {
@@ -523,18 +545,32 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		else:
 			raise SyntaxError('return outside of function')
 	elif 'comma_expr' in treetype:
-		return comma_mode([evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
+		result = comma_mode([evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
+		def flatten(array):
+			result = comma_mode()
+			if isinstance(array, (list, tuple, set)):
+				for element in array: result += flatten(element)
+			else:
+				result = comma_mode([array])
+			return result
+		if all(isinstance(element, Function) for element in flatten(result)):
+			return Function(lambda *args, **kwargs: call(result, *args, **kwargs))
+		return result
 	elif 'mapping' in treetype:
 		return MapExpr(*[evaluate(child, symlist, looped = looped, func = func) for child in tree.children])
 	elif 'bracket_expr' in treetype:
 		if 'opfunc' in treetype:
-			return Function(lambda *args, **kwargs: infix_operators[tree.children[0].token.content](*(args + (symlist,)), **kwargs), False)
+			def inner(*args, **kwargs):
+				arguments = args[:2] + (symlist,)
+				value = infix_operators[tree.children[0].token.content](*arguments)
+				return args[2:] and (value,) + args[2:] or value
+			return Function(inner, False)
 		if 'bracket' in treetype:
 				return evaluate(tree.children[0], symlist, tuple, looped = looped, func = func)
 		elif 'list' in treetype:
 			if tree.children:
 				result = evaluate(tree.children[0], symlist, list, looped = looped, func = func)
-				if not isinstance(result, list): result = [result]
+				if 'comma_expr' not in tree.children[0].type.split('/'): result = [result]
 				maps = [isinstance(element, MapExpr) for element in result]
 				if any(maps):
 					if not all(maps):
@@ -566,7 +602,8 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 						args.append(arg)
 				else:
 					args.append(evaluate(argument, symlist, looped = looped, func = func))
-			return f(evaluate(tree.children[0], symlist, looped = looped, func = func))(*args)
+			func = f(evaluate(tree.children[0], symlist, looped = looped, func = func))
+			return call(func, *args)
 	elif 'getitem' in treetype:
 		if 'comma_expr' in tree.children[1].type.split('/') or 'slice' in tree.children[1].type.split('/'):
 			ref = evaluate(tree.children[0], symlist, looped = looped, func = func)
