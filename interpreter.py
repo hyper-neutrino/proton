@@ -729,7 +729,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		return evaluate(tree.children[1], symlist, looped = looped, func = func) if hardeval(tree.children[0], symlist, looped = looped, func = func) else evaluate(tree.children[2], symlist, looped = looped, func = func)
 	elif 'call' in treetype:
 		if tree.children[0].token.content in ['eval']:
-			return symlist['eval'](*([symlist] + [evaluate(child, symlist, looped = looped, func = func) for child in tree.children[1:]]))
+			return symlist['eval'](*([symlist] + [evaluate(child, symlist, looped = looped, func = func) for child in tree.children[1:]]))[0]
 		else:
 			args = []
 			for argument in tree.children[1:]:
