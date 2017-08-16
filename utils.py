@@ -67,6 +67,26 @@ def getfunction(function, cast = True, cache = False, partial = False):
 		funcsval.append(func)
 		return func
 
+class _splat:
+	def __init__(self, array):
+		self.array = array
+	def __iter__(self):
+		return iter(self.array)
+
+def splat(obj):
+	if hasattr(obj, '__iter__'):
+		return _splat(obj)
+	return obj
+
+def determine_arguments(array):
+	result = []
+	for element in array:
+		if isinstance(element, _splat):
+			result += determine_arguments(element.array)
+		else:
+			result.append(element)
+	return result
+
 class Function:
 	def __init__(self, function, cast = True, cache = False, partial = False):
 		global id
@@ -91,6 +111,7 @@ class Function:
 		return Function(lambda *args, **kwargs: self.function(other, *args, **kwargs), self.cast, self.cache and other.cache)
 	def __call__(self, *args, **kwargs):
 		if self.cast: args = cast(args)
+		args = determine_arguments(args)
 		if self.cache and (args, kwargs) in getkey(self.function):
 			return getval(self.function, getkey(self.function).index((args, kwargs)))
 		else:
@@ -105,6 +126,14 @@ class Function:
 		def inner(*args, **kwargs):
 			return other(self(*args, **kwargs))
 		return Function(inner)
+	def __rmul__(self, times):
+		return self * times
+	def __mul__(self, times):
+		times = f(times)
+		if times == 0: return lambda *args, **kwargs: args[0] if len(args) == 1 else args
+		if times == 1: return self
+		if times == 2: return self + self
+		return self + self * (times - 1)
 	def setCaching(self, cache):
 		self.cache = cache
 		return self

@@ -211,16 +211,26 @@ def deep_search(x, y):
 				return True
 	return False
 
+def repeat(x, y):
+	if hasattr(y, '__iter__'): x, y = y, x
+	result = []
+	index = 0
+	for i in range(int(len(x) * y)):
+		result.append(x[index])
+		index += 1
+		index %= len(x)
+	return ''.join(result) if isinstance(x, str) else type(x)(result)
+
 infix_operators = {
 	'**': _(operator.pow),
 	'>>': _(operator.rshift),
 	'<<': _(operator.lshift),
-	'*': _(operator.mul),
+	'*': _(lambda x, y: repeat(x, y) if hasattr(x, '__iter__') ^ hasattr(y, '__iter__') else x * y),
 	'/': _(operator.truediv),
 	'//': _(operator.floordiv),
 	'||': _(lambda x, y: y % x == 0),
 	'%': _(operator.mod),
-	'+': _(operator.add),
+	'+': _(lambda x, y: x + str(y) if isinstance(x, str) else str(x) + y if isinstance(y, str) else x + y),
 	'-': _(operator.sub),
 	'>': _(operator.gt),
 	'<': _(operator.lt),
@@ -255,8 +265,8 @@ infix_operators = {
 	'%=': __(operator.mod),
 	'&=': __(operator.and_),
 	'|=': __(operator.or_),
-	'&&=': __(lambda x, y: x and y),
-	'||=': __(lambda x, y: x and y),
+	'&&=': __(lambda x, y: f(x) and y),
+	'||=': __(lambda x, y: f(x) or y),
 	'=': lambda x, y, z: assign(evaluate(x, z), evaluate(y, z)),
 	':=': lambda x, y, z: assign(evaluate(x, z), deepcopy(hardeval(y, z))),
 	'.': subref
@@ -366,7 +376,8 @@ prefix_operators = {
 	'$$': ___(lambda x: x.setCaching(False).wipeCache()),
 	'timeof': lambda x, s: elapsed(lambda: evaluate(x, s)),
 	'sizeof': ___(sys.getsizeof),
-	'*': ___(autosplat),
+	'*': ___(lambda x: autosplat(x) if isinstance(x, Function) else splat(x)),
+	'%': ___(lambda x: Function(lambda *args, **kwargs: splat(x(*args, **kwargs))))
 }
 
 postfix_operators = {
@@ -489,6 +500,13 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		def setter(*args):
 			symlist[tree.token.content] = args[0]
 		return Identifier(tree.token.content, getter, setter)
+	elif 'comp' in treetype:
+		result = []
+		for val in hardeval(tree.children[2], symlist, looped = looped, func = func):
+			assign(evaluate(tree.children[1], symlist, looped = looped, func = func), val)
+			if len(tree.children) < 4 or hardeval(tree.children[3], symlist, looped = looped, func = func):
+				result.append(_hardeval(tree.children[0], symlist, looped = looped, func = func))
+		return result
 	elif tree.token.content == 'unless':
 		if hardeval(tree.children[1], symlist, looped = looped, func = func):
 			return _evaluate(tree.children[2], symlist, looped = looped, func = func)
@@ -562,7 +580,15 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
-					if result.name == 'return': return result
+					if result.name == 'return':
+						try:
+							del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
+						except: pass
+						merge(sidelist, symlist)
+						return result
+			else:
+				if len(tree.children) > 3:
+					evaluate(tree.children[3])
 			try:
 				del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
 			except: pass
@@ -572,13 +598,22 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			sidelist = clone_scope(symlist)
 			evaluate(tree.children[0], sidelist, looped = looped, func = func)
 			result = None
+			broken = False
 			while not tree.children[1].children or hardeval(tree.children[1], sidelist, looped = looped, func = func):
 				result = evaluate(tree.children[-1], sidelist, looped = looped, func = func)
 				if isinstance(result, Statement):
-					if result.name == 'break': break
+					if result.name == 'break': broken = True; break
 					if result.name == 'continue': continue
-					if result.name == 'return': return result
+					if result.name == 'return':
+						try:
+							del sidelist[evaluate(tree.children[0], looped = looped, func = func).name]
+						except: pass
+						merge(sidelist, symlist)
+						return result
 				if len(tree.children) >= 4: evaluate(tree.children[2], sidelist, looped = looped, func = func)
+			if not broken:
+				if len(tree.children) > 3:
+					evaluate(tree.children[3])
 			merge(sidelist, symlist)
 			return result
 	elif tree.token.content == 'try':
@@ -588,6 +623,18 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			sidelist = clone_scope(symlist)
 			assign(evaluate(tree.children[1], sidelist), e, looped = looped, func = func)
 			return evaluate(tree.children[2], sidelist, looped = looped, func = func)
+	elif 'prebinopfunc' in treetype:
+		def inner(*args, **kwargs):
+			arguments = args[:1] + (evaluate(tree.children[0], symlist, looped = looped, func = func), symlist)
+			value = infix_operators[tree.token.content](*arguments)
+			return args[1:] and (value,) + args[1:] or value
+		return inner
+	elif 'postbinopfunc' in treetype:
+		def inner(*args, **kwargs):
+			arguments = (evaluate(tree.children[0], symlist, looped = looped, func = func),) + args[:1] + (symlist,)
+			value = infix_operators[tree.token.content](*arguments)
+			return args[1:] and (value,) + args[1:] or value
+		return inner
 	elif 'binary_operator' in tokentype or 'binary_RTL' in tokentype:
 		if tree.token.content in infix_operators:
 			return infix_operators[tree.token.content](tree.children[0], tree.children[1], symlist)
@@ -658,7 +705,8 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		elif 'list' in treetype:
 			if tree.children:
 				result = evaluate(tree.children[0], symlist, list, looped = looped, func = func)
-				if 'comma_expr' not in tree.children[0].type.split('/'): result = [result]
+				innertype = tree.children[0].type.split('/')
+				if 'comma_expr' not in innertype and 'comp' not in innertype: result = [result]
 				maps = [isinstance(element, MapExpr) for element in result]
 				if any(maps):
 					if not all(maps):

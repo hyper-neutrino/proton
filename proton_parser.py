@@ -88,11 +88,12 @@ class ParserMatcher:
 		return self.skip(nodes, match)
 
 class PatternMatcher:
-	def __init__(self, conditions, shaper, RTL = False, reiter = False):
+	def __init__(self, conditions, shaper, RTL = False, reiter = False, kill = False):
 		self.conditions = [condition if isinstance(condition, (SingleASTMatcher, PatternMatcher, ParserMatcher, BracketMatcher)) else SingleASTMatcher(*condition) for condition in conditions]
 		self.shaper = shaper
 		self.reiter = reiter
 		self.RTL = RTL
+		self.kill = kill
 	def match(self, nodes):
 		return (len(self.conditions), nodes[:len(self.conditions)]) if len(nodes) >= len(self.conditions) and all(matcher.match(node) for matcher, node in zip(self.conditions, nodes)) else None
 	def get(self, nodes, match):
@@ -101,12 +102,15 @@ class PatternMatcher:
 		return result
 	def skip(self, nodes, match):
 		return 0
+	def __str__(self):
+		return str(self.conditions)
 
 class MultiTypeMatch:
-	def __init__(self, matchers, RTL = False, reiter = False):
+	def __init__(self, matchers, RTL = False, reiter = False, kill = False):
 		self.matchers = matchers
 		self.reiter = reiter
 		self.RTL = RTL
+		self.kill = kill
 	def match(self, nodes):
 		for matcher in self.matchers:
 			match = matcher.match(nodes)
@@ -118,12 +122,13 @@ class MultiTypeMatch:
 		return match[0].skip(nodes, match[1])
 
 class BracketMatcher:
-	def __init__(self, open, close, bracket_type, reiter = True):
+	def __init__(self, open, close, bracket_type, reiter = True, kill = False):
 		self.open = open
 		self.close = close
 		self.bracket_type = bracket_type
 		self.reiter = reiter
 		self.RTL = False
+		self.kill = kill
 	def match(self, nodes):
 		if nodes and 'bracket' in nodes[0].token.type.split('/'):
 			if nodes[0].token.content == self.open:
@@ -156,7 +161,7 @@ class Parser:
 		rules = self.rules[:]
 		index = 0
 		modified = False
-		while rules:
+		while True:
 			if index % len(rules) == 0 and index:
 				modified ^= True
 				if modified:
@@ -164,7 +169,8 @@ class Parser:
 			rule = rules[index % len(rules)]
 			index += 1
 			tree = None
-			while tree != self.tree:
+			kill = False
+			while tree != self.tree and not kill:
 				tree = self.tree[:]
 				iterindex = base = len(self.tree) - 1 if rule.RTL else 0
 				delta = [1, -1][rule.RTL]
@@ -182,6 +188,7 @@ class Parser:
 						self.tree[iterindex:iterindex + match[0]] = result
 						iterindex = base
 						modified = True
+						if hasattr(rule, 'kill') and rule.kill: kill = True; break
 					else:
 						iterindex += delta
 					if iterindex >= len(self.tree) and rule.RTL: iterindex = len(self.tree) - 1
@@ -195,8 +202,13 @@ special = ['=', '.', '@', '!!', '??']
 def keyword(name):
 	return ('keyword', 'keyword', name)
 
+listcomp = [
+	PatternMatcher([('expression',), keyword('for'), ('expression',), ('colon', 'colon', ':'), ('expression',), keyword('if'), ('expression',)], lambda t, u, v, w, x, y, z: u.addChildren([t, v, x, z]).setType('comp/expression')),
+	PatternMatcher([('expression',), keyword('for'), ('expression',), ('colon', 'colon', ':'), ('expression',)], lambda t, u, v, w, x: u.addChildren([t, v, x]).setType('comp/expression')),
+]
+
 matchers = [
-	BracketMatcher(open, close, bracket_type) for open, close, bracket_type in [('(', ')', 'bracket'), ('[', ']', 'list'), ('{', '}', 'codeblock')]
+	BracketMatcher(open, close, bracket_type, reiter = reiter) for open, close, bracket_type, reiter in [('(', ')', 'bracket', listcomp), ('[', ']', 'list', listcomp), ('{', '}', 'codeblock', True)]
 ] + [
 	MultiTypeMatch([
 		PatternMatcher([('expression', lambda x: 'literal' not in x), (lambda x: 'bracket_expr' in x and 'bracket' in x,)], lambda x, y: ASTNode(lexer.Token('call/expression', ''), [x] + (y.children[0].children if y.children and y.children[0].token.type == 'comma' else y.children))),
@@ -231,8 +243,6 @@ matchers = [
 	PatternMatcher([keyword('to')], lambda w: ASTNode(lexer.Token('slice/expression', ''), [None, None, None])),
 ] + [
 	PatternMatcher([('expression',), ('maparrow',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('mapping/expression').rmType('maparrow')),
-	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
-	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr/expression'))
 ] + [
 	PatternMatcher([('expression',), ('ternary',), ('expression',), ('colon',), ('expression',)], lambda v, w, x, y, z: w.addChildren([v, x, z]).addType('expression').rmType('ternary'))
 ] + [
@@ -258,9 +268,13 @@ matchers = [
 		PatternMatcher([keyword('if'), ('expression',), (('expression', 'statement'),)], lambda x, y, z: x.addChild(y).addChild(z).addType('statement').rmType('keyword')),
 		PatternMatcher([keyword('else'), (('expression', 'statement'),)], lambda x, y: x.addChild(y).addType('statement').rmType('keyword')),
 		PatternMatcher([('statement', 'keyword', 'if'), ('statement', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
+		PatternMatcher([('statement', 'keyword', 'for'), ('statement', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
 		PatternMatcher([keyword('try'), (('expression', 'statement'),), keyword('except'), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement').rmType('keyword')),
 		PatternMatcher([('expression',), ('lambda',), (('expression', 'statement'),)], lambda x, y, z: y.addChild(x).addChild(z).setType('anonfunc/expression')),
 	], RTL = True)
+] + [
+	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
+	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr/expression'))
 ] + [
 	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True)
 ] + [
@@ -278,6 +292,13 @@ matchers = [
 	PatternMatcher([keyword('del'), ('expression',)], lambda x, y: x.addChild(y).addType('del').rmType('keyword')),
 	PatternMatcher([keyword('timeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword')),
 	PatternMatcher([keyword('sizeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword')),
+] + [
+	PatternMatcher([('expression',), ('binary_operator',)], lambda x, y: y.addChild(x).addType('prebinopfunc/expression').rmType('binary_operator'), kill = True, RTL = True),
+	PatternMatcher([('binary_operator',), ('expression',)], lambda x, y: x.addChild(y).addType('postbinopfunc/expression').rmType('binary_operator'), kill = True, RTL = True),
+	PatternMatcher([('expression',), ('binary_RTL',)], lambda x, y: y.addChild(x).addType('prebinopfunc/expression').rmType('binary_RTL'), kill = True, RTL = True),
+	PatternMatcher([('binary_RTL',), ('expression',)], lambda x, y: x.addChild(y).addType('postbinopfunc/expression').rmType('binary_RTL'), kill = True, RTL = True),
+	PatternMatcher([(('binary_operator', 'binary_RTL'),)], lambda x: x.setType('binopfunc/expression'), kill = True, RTL = True),
+	PatternMatcher([('unifix_operator',)], lambda x: x.setType('unopfunc/expression'), kill = True, RTL = True)
 ] + [
 	PatternMatcher([keyword('return'), ('expression',)], lambda x, y: x.addChild(y).addType('return_statement/expression').rmType('keyword')),
 	PatternMatcher([keyword('return')], lambda x: x.addChild(None).addType('return_statement/expression').rmType('keyword'))

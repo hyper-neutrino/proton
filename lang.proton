@@ -14,19 +14,11 @@ sleep = time.sleep
 	return string
 }
 
-!!map = function, list => {
-	result = []
-	for value : list result.append(function(value))
-	return result
-}
+!!map = (function, array) => [function(value) for value : array]
 
-!!filter = function, list => {
-	result = []
-	for value : list if function(value) result.append(value)
-	return type(list)(result)
-}
+!!filter = (function, array) => [value for value : array if function(value)]
 
-!!reduce = function, array => {
+!!reduce = (function, array) => {
 	list = list(array)
 	if !list return 0
 	while (len(list) > 1) {
@@ -35,7 +27,7 @@ sleep = time.sleep
 	return list[0]
 }
 
-!!digits = base, number => {
+!!digits = (base, number) => {
 	result = []
 	trunc = number % 1
 	number = int(number)
@@ -65,13 +57,13 @@ select = *indices => array => {
 	return type(array)(result)
 }
 
-!!cartesianproduct = left, right => {
+!!cartesianproduct = (left, right) => {
 	result = []
 	for l : left for r : right result.append((l, r))
 	return result
 }
 
-!!cartesianpower = power, array => {
+!!cartesianpower = (power, array) => {
 	if power == 0 return []
 	if power == 1 return array
 	if power == 2 return cartesianproduct(array, array)
@@ -80,14 +72,6 @@ select = *indices => array => {
 	return result
 }
 
-!!prefixes = array => {
-	result = []
-	for i : range(len(array)) result.append(array[to i + 1])
-	return result
-}
+!!prefixes = array => [array[to i + 1] for i : range(len(array))]
 
-!!suffixes = array => {
-	result = []
-	for i : range(len(array)) result.append(array[i to])
-	return result
-}
+!!suffixes = array => [array[i to] for i : range(len(array))]

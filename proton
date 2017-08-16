@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import lexer, proton_parser, interpreter, sys, traceback
+import lexer, proton_parser, interpreter, sys, traceback, os
 
 from errors import *
 from utils import *
@@ -65,6 +65,7 @@ if __name__ == '__main__':
 			print(traceback.format_exc(limit = limit), file = sys.stderr)
 	else:
 		lang = interpreter.include('lang')
+		symlist['restart'] = lambda: os.system('reset') and None or os.execl((interpreter.path and interpreter.path + '/') + 'proton', '')
 		for i in lang:
 			symlist[i] = lang[i]
 		code = ''
