@@ -530,6 +530,9 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 					if result.name == 'continue': continue
 					if result.name == 'return': return result
 				value = hardeval(tree.children[0], sidelist, looped = looped, func = func)
+			else:
+				if len(tree.children) > 3:
+					evaluate(tree.children[3])
 			del sidelist[evaluate(tree.children[1], looped = looped, func = func).name]
 			merge(sidelist, symlist)
 			return result
@@ -541,6 +544,9 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 					if result.name == 'break': break
 					if result.name == 'continue': continue
 					if result.name == 'return': return result
+			else:
+				if len(tree.children) > 2:
+					evaluate(tree.children[2])
 			return result
 	elif tree.token.content == 'repeat':
 		if 'repeatinto' in treetype:

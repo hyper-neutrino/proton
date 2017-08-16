@@ -269,6 +269,7 @@ matchers = [
 		PatternMatcher([keyword('else'), (('expression', 'statement'),)], lambda x, y: x.addChild(y).addType('statement').rmType('keyword')),
 		PatternMatcher([('statement', 'keyword', 'if'), ('statement', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
 		PatternMatcher([('statement', 'keyword', 'for'), ('statement', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
+		PatternMatcher([('statement', 'keyword', 'while'), ('statement', 'keyword', 'else')], lambda x, y: x.addChild(y.children[0]).rmType('keyword')),
 		PatternMatcher([keyword('try'), (('expression', 'statement'),), keyword('except'), ('expression',), (('expression', 'statement'),)], lambda v, w, x, y, z: v.addChildren([w, y, z]).addType('statement').rmType('keyword')),
 		PatternMatcher([('expression',), ('lambda',), (('expression', 'statement'),)], lambda x, y, z: y.addChild(x).addChild(z).setType('anonfunc/expression')),
 	], RTL = True)
