@@ -524,7 +524,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			result = None
 			while value:
 				assign(evaluate(tree.children[1], sidelist, looped = looped, func = func), value)
-				result = evaluate(tree.children[2], sidelist, looped = looped, func = func)
+				result = evaluate(tree.children[2], sidelist, looped = True, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
@@ -536,7 +536,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		else:
 			result = None
 			while hardeval(tree.children[0], symlist, looped = looped, func = func):
-				result = _evaluate(tree.children[1], symlist, looped = looped, func = func)
+				result = _evaluate(tree.children[1], symlist, looped = True, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
@@ -550,7 +550,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			result = None
 			while index < value:
 				assign(evaluate(tree.children[1], sidelist, looped = looped, func = func), index)
-				result = evaluate(tree.children[2], sidelist, looped = looped, func = func)
+				result = evaluate(tree.children[2], sidelist, looped = True, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
@@ -563,7 +563,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			result = None
 			value = f(hardeval(tree.children[0], symlist, looped = looped, func = func))
 			while value:
-				result = _evaluate(tree.children[1], symlist, looped = looped, func = func)
+				result = _evaluate(tree.children[1], symlist, looped = True, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': break
 					if result.name == 'continue': continue
@@ -600,7 +600,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 			result = None
 			broken = False
 			while not tree.children[1].children or hardeval(tree.children[1], sidelist, looped = looped, func = func):
-				result = evaluate(tree.children[-1], sidelist, looped = looped, func = func)
+				result = evaluate(tree.children[-1], sidelist, looped = True, func = func)
 				if isinstance(result, Statement):
 					if result.name == 'break': broken = True; break
 					if result.name == 'continue': continue
