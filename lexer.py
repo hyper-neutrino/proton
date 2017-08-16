@@ -136,7 +136,7 @@ def recurstr(array):
 		return str(list(map(recurstr, array)))
 	return str(array)
 
-keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof', 'sizeof', 'del', 'return', 'repeat']
+keywords = ['if', 'else', 'unless', 'while', 'for', 'try', 'except', 'exist not', 'exist', 'exists not', 'exists', 'break', 'continue', 'import', 'include', 'as', 'from', 'to', 'by', 'timeof', 'sizeof', 'del', 'return', 'repeat', 'const']
 
 ignore = ('not',)
 

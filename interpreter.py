@@ -145,8 +145,12 @@ def walk(x):
 		return result
 	return [x]
 
-def assign(x, y):
-	if not all(isinstance(node, Identifier) for node in walk(x)): return assign(y, x)
+def assign(x, y, r = False):
+	if not all(isinstance(node, Identifier) for node in walk(x)):
+		if r:
+			raise RuntimeError('Cannot assign to non-identifier')
+		else:
+			return assign(y, x, True)
 	if hasattr(x, '__iter__'):
 		if hasattr(y, '__iter__'):
 			if len(x) < len(y):
@@ -498,8 +502,19 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		def getter():
 			return None if tree.token.content not in symlist else symlist[tree.token.content]
 		def setter(*args):
+			if 'const' in symlist and tree.token.content in symlist['const']:
+				raise RuntimeError('Cannot set constant value ' + tree.token.content)
 			symlist[tree.token.content] = args[0]
 		return Identifier(tree.token.content, getter, setter)
+	elif 'const' in treetype:
+		left  = evaluate(tree.children[0], symlist, looped = looped, func = func)
+		right = evaluate(tree.children[1], symlist, looped = looped, func = func)
+		if not all(isinstance(node, Identifier) for node in walk(left)):
+			left, right = right, left
+		assign(left, right)
+		if 'const' not in symlist: symlist['const'] = []
+		for node in walk(left):
+			symlist['const'] += node.name
 	elif 'comp' in treetype:
 		result = []
 		for val in hardeval(tree.children[2], symlist, looped = looped, func = func):
@@ -680,7 +695,7 @@ def evaluate(tree, symlist = None, comma_mode = tuple, looped = False, func = Fa
 		else:
 			raise SyntaxError('return outside of function')
 	elif 'comma_expr' in treetype:
-		result = comma_mode(f(evaluate(child, symlist, looped = looped, func = func)) for child in tree.children)
+		result = comma_mode(evaluate(child, symlist, looped = looped, func = func) for child in tree.children)
 		def flatten(array):
 			result = comma_mode()
 			if isinstance(array, (list, tuple, set)):

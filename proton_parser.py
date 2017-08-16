@@ -277,6 +277,7 @@ matchers = [
 	PatternMatcher([(('expression', 'comma_expr'),), ('comma',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('comma_expr/expression') if 'comma_expr' not in x.type.split('/') else x.addChild(z)),
 	PatternMatcher([('expression',), ('comma',)], lambda x, y: y.addChild(x).addType('comma_expr/expression'))
 ] + [
+	PatternMatcher([keyword('const'), ('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda w, x, y, z: w.addChild(x).addChild(z).addType('const/expression').rmType('keyword')),
 	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', '='), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True)
 ] + [
 	PatternMatcher([(lambda k: 'expression' in k and 'statement' not in k,), ('semicolon', 'semicolon', ';')], lambda x, y: x.addType('statement').rmType('expression').rmType('semicolon'))
