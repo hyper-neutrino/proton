@@ -178,7 +178,7 @@ def h(x):
 	index = 0
 	while index < len(x):
 		if x[index] == '\\':
-			result += x[index + 1]
+			result += eval('"\\' + x[index + 1] + '"')
 			index += 1
 		elif x[index] == '#':
 			if x[index + 1] == '{':
