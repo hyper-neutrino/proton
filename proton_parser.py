@@ -88,12 +88,13 @@ class ParserMatcher:
 		return self.skip(nodes, match)
 
 class PatternMatcher:
-	def __init__(self, conditions, shaper, RTL = False, reiter = False, kill = False):
+	def __init__(self, conditions, shaper, RTL = False, reiter = False, kill = False, head = False):
 		self.conditions = [condition if isinstance(condition, (SingleASTMatcher, PatternMatcher, ParserMatcher, BracketMatcher)) else SingleASTMatcher(*condition) for condition in conditions]
 		self.shaper = shaper
 		self.reiter = reiter
 		self.RTL = RTL
 		self.kill = kill
+		self.head = head
 	def match(self, nodes):
 		return (len(self.conditions), nodes[:len(self.conditions)]) if len(nodes) >= len(self.conditions) and all(matcher.match(node) for matcher, node in zip(self.conditions, nodes)) else None
 	def get(self, nodes, match):
@@ -196,7 +197,10 @@ class Parser:
 				tree = self.tree[:]
 				iterindex = base = len(self.tree) - 1 if rule.RTL else 0
 				delta = [1, -1][rule.RTL]
+				done = False
 				while (rule.RTL and iterindex >= 0) or (not rule.RTL and iterindex < len(self.tree)):
+					if done and hasattr(rule, 'head') and rule.head: break
+					done = True
 					match = rule.match(self.tree[iterindex:])
 					if match:
 						result = rule.get(self.tree[iterindex:], match[1])
@@ -245,15 +249,17 @@ matchers = [
 	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'colon' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('foriter')),
 	PatternMatcher([('bracket', 'bracket', '', lambda k: any(x.token.type == 'arrow' for x in k[0]))], lambda x: x.addChild(x.children[0]).addChild(x.children[2]).removeChildren(x.children[:3]).setType('whilearrow')),
 ] + [
+	PatternMatcher([('expression',), ('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.postfix_operators if elem not in special))], lambda x, y: y.addChild(x).addType('postfix/expression').rmType('unifix_operator')),
+	PatternMatcher([('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.prefix_operators if elem not in special)), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
+	PatternMatcher([(lambda x: 'expression' not in x,), ('binary_operator', 'binary_operator', '-'), ('expression',)], lambda q, x, y: [q, x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator')]),
+	PatternMatcher([('binary_operator', 'binary_operator', '-'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator'), head = True),
+] + [
 	PatternMatcher([('expression',), ('binary_RTL', 'binary_RTL', tuple(elem for elem in row if elem not in special)), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_RTL'), True) for row in lexer.binary_RTL
 ] + [
 	PatternMatcher([('expression',), ('binary_operator', 'binary_operator', tuple(elem for elem in row if elem not in special)), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('binary_operator')) for row in lexer.binary_operators
 ] + [
-	PatternMatcher([('expression',), ('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.postfix_operators if elem not in special))], lambda x, y: y.addChild(x).addType('postfix/expression').rmType('unifix_operator')),
-	PatternMatcher([('unifix_operator', 'unifix_operator', tuple(elem for elem in lexer.prefix_operators if elem not in special)), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
 	PatternMatcher([('binary_operator', 'binary_operator', '*'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator')),
 ] + [
-	PatternMatcher([('binary_operator', 'binary_operator', '-'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator'))
 ] + [
 	PatternMatcher([('expression',), keyword(name), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('expression').rmType('keyword')) for name in ['from', 'as']
 ] + [
