@@ -82,9 +82,9 @@ first = select(0)
 
 last = select(-1)
 
-head = (x, y) => y[to x]
+!!head = (x, y) => y[to x]
 
-tail = (x, y) => y[x to]
+!!tail = (x, y) => y[len(y) - x to]
 
 pop = x => x[to -1]
 
