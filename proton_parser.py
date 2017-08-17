@@ -312,7 +312,8 @@ matchers = [
 	PatternMatcher([keyword('break')], lambda x: x.setType('break_statement/expression')),
 	PatternMatcher([keyword('continue')], lambda x: x.setType('continue_statement/expression'))
 ] + [
-	PatternMatcher([('unifix_operator', 'unifix_operator',  ('@', '!!', '%%')), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
+	PatternMatcher([('unifix_operator', 'unifix_operator', ('@', '!!', '%%', '&')), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('unifix_operator')),
+	PatternMatcher([('binary_operator', 'binary_operator', '&'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('binary_operator').setTokenType('unifix_operator')),
 	PatternMatcher([keyword('del'), ('expression',)], lambda x, y: x.addChild(y).addType('del').rmType('keyword')),
 	PatternMatcher([keyword('timeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword')),
 	PatternMatcher([keyword('sizeof'), ('expression',)], lambda x, y: x.addChild(y).addType('prefix/expression').rmType('keyword')),
