@@ -153,6 +153,28 @@ class BracketMatcher:
 	def skip(self, nodes, match):
 		return 0
 
+class DictMatcher:
+	def __init__(self):
+		self.reiter = False
+		self.RTL = False
+		self.kill = False
+	def match(self, nodes):
+		types = [node.type for node in nodes]
+		trail = ['expression', 'colon', 'expression', 'comma'] * (len(types) // 4)
+		if all(a in b.split('/') for a, b in zip(trail, types)) and len(types) % 4 in [0, 3]:
+			children = []
+			for i in range(0, len(types), 4):
+				children.append(ASTNode(lexer.Token('mapping/expression', ''), [nodes[i], nodes[i + 2]]))
+			return (len(nodes), ASTNode(lexer.Token('bracket_expr/list/expression', ''), [ASTNode(lexer.Token('comma/comma_expr/expression', ','), children)]))
+	def get(self, nodes, match):
+		return match
+	def skip(self, nodes, match):
+		return 0
+
+class Prepend:
+	def __init__(self, array):
+		self.array = array
+
 class Parser:
 	def __init__(self, rules, tokens, config = False):
 		self.rules = rules
@@ -181,6 +203,8 @@ class Parser:
 						if rule.reiter:
 							if rule.reiter is True:
 								result = Parser(self.rules, result, True).construct_tree()
+							elif isinstance(rule.reiter, Prepend):
+								result = Parser(rule.reiter.array + self.rules, result, True).construct_tree()
 							else:
 								result = Parser(self.rules + rule.reiter, result, True).construct_tree()
 						if hasattr(rule, 'postconfig'): result = rule.postconfig(result)
@@ -208,7 +232,7 @@ listcomp = [
 ]
 
 matchers = [
-	BracketMatcher(open, close, bracket_type, reiter = reiter) for open, close, bracket_type, reiter in [('(', ')', 'bracket', listcomp), ('[', ']', 'list', listcomp), ('{', '}', 'codeblock', True)]
+	BracketMatcher(open, close, bracket_type, reiter = reiter) for open, close, bracket_type, reiter in [('(', ')', 'bracket', listcomp), ('[', ']', 'list', listcomp), ('{', '}', 'codeblock', Prepend([DictMatcher()]))]
 ] + [
 	MultiTypeMatch([
 		PatternMatcher([('expression', lambda x: 'literal' not in x), (lambda x: 'bracket_expr' in x and 'bracket' in x,)], lambda x, y: ASTNode(lexer.Token('call/expression', ''), [x] + (y.children[0].children if y.children and y.children[0].token.type == 'comma' else y.children))),
@@ -242,7 +266,7 @@ matchers = [
 	PatternMatcher([keyword('to'), ('expression',)], lambda w, x: ASTNode(lexer.Token('slice/expression', ''), [None, x, None])),
 	PatternMatcher([keyword('to')], lambda w: ASTNode(lexer.Token('slice/expression', ''), [None, None, None])),
 ] + [
-	PatternMatcher([('expression',), ('maparrow',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('mapping/expression').rmType('maparrow')),
+	# PatternMatcher([('expression',), ('maparrow',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('mapping/expression').rmType('maparrow')),
 ] + [
 	PatternMatcher([('expression',), ('ternary',), ('expression',), ('colon',), ('expression',)], lambda v, w, x, y, z: w.addChildren([v, x, z]).addType('expression').rmType('ternary'))
 ] + [
