@@ -75,3 +75,17 @@ select = *indices => array => {
 !!prefixes = array => [array[to i + 1] for i : range(len(array))]
 
 !!suffixes = array => [array[i to] for i : range(len(array))]
+
+identity = x => x
+
+first = select(0)
+
+last = select(-1)
+
+head = (x, y) => y[to x]
+
+tail = (x, y) => y[x to]
+
+pop = x => x[to -1]
+
+dequeue = x => x[1 to]

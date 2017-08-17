@@ -124,7 +124,7 @@ binary_operators = [
 	('in', 'not in', 'is', 'are', 'is not', 'are not', 'inside', 'not inside'),
 ]
 
-prefix_operators = ['!', '++', '--', '~', '@', '$', '$$', '!!']
+prefix_operators = ['!', '++', '--', '~', '@', '$', '$$', '!!', '%%']
 postfix_operators = ['!', '++', '--', '??']
 
 unifix_operators = prefix_operators + postfix_operators

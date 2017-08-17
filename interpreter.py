@@ -305,6 +305,7 @@ def elapsed(gen):
 	return time.time() - start
 
 def get_index(array, index):
+	print(array, index)
 	if isinstance(array, int):
 		return int(bool(array & (1 << index)))
 	else:
@@ -381,7 +382,7 @@ prefix_operators = {
 	'timeof': lambda x, s: elapsed(lambda: evaluate(x, s)),
 	'sizeof': ___(sys.getsizeof),
 	'*': ___(lambda x: autosplat(x) if isinstance(x, Function) else splat(x)),
-	'%': ___(lambda x: Function(lambda *args, **kwargs: splat(x(*args, **kwargs))))
+	'%%': ___(lambda x: Function(lambda *args, **kwargs: splat(x(*args, **kwargs))))
 }
 
 postfix_operators = {
