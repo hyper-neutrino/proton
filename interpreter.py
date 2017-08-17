@@ -305,7 +305,6 @@ def elapsed(gen):
 	return time.time() - start
 
 def get_index(array, index):
-	print(array, index)
 	if isinstance(array, int):
 		return int(bool(array & (1 << index)))
 	else:
