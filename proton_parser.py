@@ -271,6 +271,7 @@ matchers = [
 	PatternMatcher([('expression',), keyword('to')], lambda v, w: ASTNode(lexer.Token('slice/expression', ''), [v, None, None])),
 	PatternMatcher([keyword('to'), ('expression',)], lambda w, x: ASTNode(lexer.Token('slice/expression', ''), [None, x, None])),
 	PatternMatcher([keyword('to')], lambda w: ASTNode(lexer.Token('slice/expression', ''), [None, None, None])),
+	PatternMatcher([keyword('by'), ('expression',)], lambda y, z: ASTNode(lexer.Token('slice/expression', ''), [None, None, z])),
 ] + [
 	# PatternMatcher([('expression',), ('maparrow',), ('expression',)], lambda x, y, z: y.addChild(x).addChild(z).addType('mapping/expression').rmType('maparrow')),
 ] + [
