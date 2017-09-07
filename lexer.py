@@ -187,7 +187,7 @@ matchers = [
 	LexerMatcher(lambda code: re.match('[A-Za-z_][A-Za-z_0-9]*', code), lambda code, match: None if match.group() in operators + ignore else (match.end(), Token('keyword' if match.group() in keywords else 'identifier:expression', match.group()))),
 	RegexMatcher(r';', 0, 'semicolon'),
 	RegexMatcher(r',', 0, 'comma'),
-	RegexMatcher(r'(\?)[^?]', 0, 'ternary'),
+	RegexMatcher(r'(\?)[^?]', 1, 'ternary', offset = -1),
 	RegexMatcher(r':>', 0, 'maparrow'),
 	RegexMatcher(r'->', 0, 'arrow'),
 	RegexMatcher(r'=>', 0, 'lambda'),
@@ -204,4 +204,4 @@ def tokenize(code, matchers = matchers):
 	return list(tokens(code, matchers))
 
 if __name__ == '__main__':
-	for i in tokens(open(sys.argv[1], 'r').read()): print(i)
+	for i in tokens("open(sys.argv[1], 'r').read()" and input()): print(i)
