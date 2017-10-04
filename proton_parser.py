@@ -161,7 +161,7 @@ class DictMatcher:
 		self.kill = False
 	def match(self, nodes):
 		types = [node.type for node in nodes]
-		trail = ['expression', 'colon', 'expression', 'comma'] * (len(types) // 4)
+		trail = ['expression', 'colon', 'expression', 'comma'] * (len(types) // 4 + 1)
 		if all(a in b.split('/') for a, b in zip(trail, types)) and len(types) % 4 in [0, 3]:
 			children = []
 			for i in range(0, len(types), 4):
