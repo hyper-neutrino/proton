@@ -1,4 +1,4 @@
-import re, ast, sys
+import re, ast, sys, sympy
 
 from errors import *
 from utils import *
@@ -161,7 +161,7 @@ def flags(key):
 def intify(base):
 	def inner(string):
 		left, right = re.split('[^0-9]', string, 1)
-		return int(right, base) * (base ** int(left))
+		return sympy.Integer(int(right, base) * (base ** int(left)))
 	return inner
 
 matchers = [
@@ -169,16 +169,16 @@ matchers = [
 	RegexMatcher(r'/\*([^*]|\*[^/])*\*/', -1, 'comment'),
 	RegexMatcher('(%s)' % '|'.join('\\(\\s*%s\\s*\\)' % re.escape(operator) for operator in sum(binary_operators, ())), 1, 'binopfunc/expression', lambda x: x[1:-1].strip()),
 	RegexMatcher('(%s)' % '|'.join('\\(\\s*%s\\s*\\)' % re.escape(operator) for operator in          unifix_operators), 1,  'unopfunc/expression', lambda x: x[1:-1].strip()),
-	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
-	LexerMatcher(lambda code, last: None if last and 'expression' in last.type else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and ('expression' in last.type or 'bracket' in last.type and ')' == last.content) else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/([ailmsx]*)', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1), flags(match.groups()[-1])))), getlast = True),
+	LexerMatcher(lambda code, last: None if last and ('expression' in last.type or 'bracket' in last.type and ')' == last.content) else re.match(r'/((\s*([^)/]|\\.)([^/\\]|\\.)*)?)/', code), lambda code, match: (match.end(), Token('literal:expression', re.compile(match.group(1)))), getlast = True),
 	RegexMatcher(r'\d+b[01]+', 0, 'literal:expression', intify(2)),
 	RegexMatcher(r'\d+o[0-7]+', 0, 'literal:expression', intify(8)),
 	RegexMatcher(r'\d+x[0-9a-fA-F]+', 0, 'literal:expression', intify(16)),
-	RegexMatcher(r'\d+e\d+', 0, 'literal:expression', lambda x: (lambda y: int(y[0]) * 10 ** int(y[1]))(x.split('e'))),
-	RegexMatcher(r'\d*\.\d+j', 0, 'literal:expression', complex),
-	RegexMatcher(r'\d+j', 0, 'literal:expression', complex),
-	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', float),
-	RegexMatcher(r'\d+', 0, 'literal:expression', int),
+	RegexMatcher(r'\d+e\d+', 0, 'literal:expression', lambda x: (lambda y: sympy.Integer(y[0]) * 10 ** sympy.Integer(y[1]))(x.split('e'))),
+	RegexMatcher(r'\d*\.\d+j', 0, 'literal:expression', lambda x: sympy.I * sympy.Rational(x[:-1])),
+	RegexMatcher(r'\d+j', 0, 'literal:expression', lambda x: sympy.I * int(x[:-1])),
+	RegexMatcher(r'\d*\.\d+', 0, 'literal:expression', sympy.Rational),
+	RegexMatcher(r'\d+', 0, 'literal:expression', sympy.Integer),
 	RegexMatcher(r'"([^"\\]|\\.)*"', 0, 'literal:expression', lambda x: x[1:-1]),
 	RegexMatcher(r"'([^'\\]|\\.)*'", 0, 'literal:expression', lambda x: x[1:-1]),
 	ErrorMatcher(RegexMatcher(r'"([^"\\]|\\.)*', 0, ''), UnclosedStringError),
