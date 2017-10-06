@@ -428,6 +428,10 @@ for name in dir(builtins):
 			default[name] = getfunction(default[name])
 	except:
 		pass
+	
+default["int"] = getfunction(sympy.Integer)
+default["float"] = getfunction(sympy.Rational)
+# TODO default["complex"]
 
 class proton_str(str):
 	def __init__(self, obj):
