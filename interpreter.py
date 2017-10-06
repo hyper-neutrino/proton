@@ -225,10 +225,13 @@ def repeat(x, y):
 		index %= len(x)
 	return ''.join(result) if isinstance(x, str) else type(x)(result)
 
+def s_(function, modif):
+	return lambda *args: function(*map(modif, args))
+
 infix_operators = {
 	'**': _(operator.pow),
-	'>>': _(operator.rshift),
-	'<<': _(operator.lshift),
+	'>>': _(s_(operator.rshift, int)),
+	'<<': _(s_(operator.lshift, int)),
 	'*': _(lambda x, y: repeat(x, y) if hasattr(x, '__iter__') ^ hasattr(y, '__iter__') else x * y),
 	'/': _(operator.truediv),
 	'//': _(operator.floordiv),
@@ -251,9 +254,9 @@ infix_operators = {
 	'is not': english_convenienced_function(inverse(lambda x, y: instanceof(x, y.function))),
 	'are': english_convenienced_function(lambda x, y: instanceof(x, y.function)),
 	'are not': english_convenienced_function(inverse(lambda x, y: instanceof(x, y.function))),
-	'&': _(operator.and_, False, False),
-	'|': _(operator.or_),
-	'^': _(operator.xor),
+	'&': _(s_(operator.and_, int), False, False),
+	'|': _(s_(operator.or_, int)),
+	'^': _(s_(operator.xor, int)),
 	'and'  : lambda x, y, z: (lambda k: k if not k else f(evaluate(y, z)))(f(evaluate(x, z))),
 	'or'   : lambda x, y, z: (lambda k: k   if   k else f(evaluate(y, z)))(f(evaluate(x, z))),
 	'nand' : lambda x, y, z: (lambda k: f(evaluate(y, z))   if   k else k)(f(evaluate(x, z))),
@@ -264,11 +267,11 @@ infix_operators = {
 	'//=': __(operator.floordiv),
 	'+=': __(operator.add),
 	'-=': __(operator.sub),
-	'>>=': __(operator.rshift),
-	'<<=': __(operator.lshift),
+	'>>=': __(s_(operator.rshift, int)),
+	'<<=': __(s_(operator.lshift, int)),
 	'%=': __(operator.mod),
-	'&=': __(operator.and_),
-	'|=': __(operator.or_),
+	'&=': __(s(operator.and_, int)),
+	'|=': __(s_(operator.or_, int)),
 	'&&=': __(lambda x, y: f(x) and y),
 	'||=': __(lambda x, y: f(x) or y),
 	'=': lambda x, y, z: assign(evaluate(x, z), evaluate(y, z)),
