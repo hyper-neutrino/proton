@@ -1,4 +1,4 @@
-import proton_parser, lexer, operator, math, sys, builtins, time
+import proton_parser, lexer, operator, math, sys, builtins, time, sympy
 
 from utils import *
 from copy import *
@@ -372,7 +372,7 @@ def autosplat(function):
 
 prefix_operators = {
 	'!': ___(operator.not_),
-	'~': ___(s_(operator.invert)),
+	'~': ___(s_(operator.invert, int)),
 	'++': lambda x, z: (lambda k: k(f(k) + 1))(evaluate(x, z)),
 	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z)),
 	'-': ___(negative),
@@ -428,7 +428,7 @@ for name in dir(builtins):
 			default[name] = getfunction(default[name])
 	except:
 		pass
-	
+
 default["int"] = getfunction(sympy.Integer)
 default["float"] = getfunction(sympy.Rational)
 # TODO default["complex"]
