@@ -1,3 +1,5 @@
+from functools import *
+
 def FT(key, function = lambda x: x):
 	print(function(key))
 	return key
