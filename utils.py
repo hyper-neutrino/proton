@@ -110,7 +110,7 @@ class Function:
 	def __rand__(self, other):
 		return Function(lambda *args, **kwargs: self.function(other, *args, **kwargs), self.cast, self.cache and other.cache)
 	def __rdiv__(self, other):
-		return list(reduce(self, other))
+		return reduce(self, other)
 	def __call__(self, *args, **kwargs):
 		if self.cast: args = cast(args)
 		args = determine_arguments(args)
@@ -136,7 +136,7 @@ class Function:
 			def inner(*args, **kwargs):
 				value = self(*args, **kwargs)
 				while not times(value):
-					value = self(*args, **kwargs)
+					value = self(value, *(args[1:]), **kwargs)
 				return value
 			return inner
 		if times == 0: return lambda *args, **kwargs: args[0] if len(args) == 1 else args
