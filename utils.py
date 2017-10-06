@@ -109,6 +109,8 @@ class Function:
 		return Function(lambda *args, **kwargs: self.function(*(args + (other,)), **kwargs), self.cast, self.cache and other.cache)
 	def __rand__(self, other):
 		return Function(lambda *args, **kwargs: self.function(other, *args, **kwargs), self.cast, self.cache and other.cache)
+	def __rdiv__(self, other):
+		return list(reduce(self, other))
 	def __call__(self, *args, **kwargs):
 		if self.cast: args = cast(args)
 		args = determine_arguments(args)
