@@ -372,7 +372,7 @@ def autosplat(function):
 
 prefix_operators = {
 	'!': ___(operator.not_),
-	'~': ___(operator.invert),
+	'~': ___(s_(operator.invert)),
 	'++': lambda x, z: (lambda k: k(f(k) + 1))(evaluate(x, z)),
 	'--': lambda x, z: (lambda k: k(f(k) - 1))(evaluate(x, z)),
 	'-': ___(negative),
