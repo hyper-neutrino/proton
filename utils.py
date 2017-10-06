@@ -132,6 +132,13 @@ class Function:
 		return self * times
 	def __mul__(self, times):
 		times = f(times)
+		if isinstance(times, Function):
+			def inner(*args, **kwargs):
+				value = self(*args, **kwargs)
+				while not times(value):
+					value = self(*args, **kwargs)
+				return value
+			return inner
 		if times == 0: return lambda *args, **kwargs: args[0] if len(args) == 1 else args
 		if times == 1: return self
 		if times == 2: return self + self
