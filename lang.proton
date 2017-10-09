@@ -76,6 +76,18 @@ select = *indices => array => {
 
 !!suffixes = array => [array[i to] for i : range(len(array))]
 
+pyrange = range + list
+
+range = *a => {
+    if len(a) == 0 return -1
+    if len(a) == 1 {
+        a = a[0]
+        if a is list return max(a) - min(a)
+        else return pyrange(a)
+    }
+    return pyrange(*a)
+}
+
 identity = x => x
 
 first = select(0)

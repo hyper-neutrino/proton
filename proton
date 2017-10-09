@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import lexer, proton_parser, interpreter, sys, traceback, os
+import lexer, proton_parser, newinterpreter, sys, traceback, os
 
 from errors import *
 from utils import *
@@ -29,11 +29,11 @@ flags = {
 	'-h': (0, lambda s: showhelp(), help)
 }
 
-interpreter.setPath(('/' in sys.argv[0]) and sys.argv[0][:sys.argv[0].rfind('/')] or '')
+newinterpreter.setPath(('/' in sys.argv[0]) and sys.argv[0][:sys.argv[0].rfind('/')] or '')
 
 if __name__ == '__main__':
 	sys.setrecursionlimit(100000)
-	symlist = {x: interpreter.default[x] for x in interpreter.default}
+	symlist = {x: newinterpreter.default[x] for x in newinterpreter.default}
 	code = None
 	def assign(x):
 		code = x
@@ -57,15 +57,15 @@ if __name__ == '__main__':
 		raise SystemExit(flags[flag][2])
 	if code is not None:
 		try:
-			lang = interpreter.include('lang')
+			lang = newinterpreter.include('lang')
 			for i in lang:
 				symlist[i] = lang[i]
-			interpreter.complete(proton_parser.parse(lexer.tokenize(code)), symlist)
+			newinterpreter.complete(proton_parser.parse(lexer.tokenize(code)), symlist)
 		except:
 			print(traceback.format_exc(limit = limit), file = sys.stderr)
 	else:
-		lang = interpreter.include('lang')
-		symlist['restart'] = lambda: os.system('reset') and None or os.execl((interpreter.path and interpreter.path + '/') + 'proton', '')
+		lang = newinterpreter.include('lang')
+		symlist['restart'] = lambda: os.system('reset') and None or os.execl((newinterpreter.path and newinterpreter.path + '/') + 'proton', '')
 		for i in lang:
 			symlist[i] = lang[i]
 		code = ''
@@ -78,8 +78,8 @@ if __name__ == '__main__':
 			except KeyboardInterrupt:
 				print('\b\bKeyboardInterrupt')
 			try:
-				result = interpreter.complete(proton_parser.parse(lexer.tokenize(code)), symlist)[0]
-				if result is not None: print(interpreter.proton_str(result))
+				result = newinterpreter.complete(proton_parser.parse(lexer.tokenize(code)), symlist)[0]
+				if result is not None: print(newinterpreter.proton_str(result))
 				code = ''
 			except (UnclosedBracketError, UnclosedStringError):
 				pass
